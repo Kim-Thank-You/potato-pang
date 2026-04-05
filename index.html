@@ -2,8 +2,78 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>🥔 Potato Pang v3</title>
+<!-- Telegram WebApp SDK -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+(function(){
+  /* ── 뷰포트 높이 CSS 변수 동기화 ── */
+  function syncViewport(){
+    var h;
+    if(window.Telegram&&Telegram.WebApp){
+      h=Telegram.WebApp.viewportStableHeight||Telegram.WebApp.viewportHeight;
+    }
+    if(!h||h<100) h=window.innerHeight;
+    document.documentElement.style.setProperty('--tg-viewport-stable-height', h+'px');
+  }
+  syncViewport();
+
+  /* ── 텔레그램 WebApp API 초기화 ── */
+  if(window.Telegram&&Telegram.WebApp){
+    var tg=Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    if(tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+    if(tg.enableClosingConfirmation) tg.enableClosingConfirmation();
+    tg.onEvent('viewportChanged', syncViewport);
+  }
+  window.addEventListener('resize', syncViewport);
+
+  /* ── 핵심: JS 레벨에서 수직 스와이프 완전 차단 ──────────────────────
+     허용 컨테이너: .lobby-scroll, .result-scroll (내부 스크롤 허용)
+     허용 영역: #board (게임 보드 — pointer 이벤트로 스왑 처리)
+     나머지: 전부 차단
+  ─────────────────────────────────────────────────────────────────── */
+  var _touchStartY = 0;
+
+  // [GESTURE_QA] touchstart: Y좌표 기록만. preventDefault 전역 제거
+  // → 버튼/토글/CTA 탭 정상화. 스크롤 차단은 touchmove에서만 처리.
+  document.addEventListener('touchstart', function(e){
+    if(e.touches && e.touches.length > 0){
+      _touchStartY = e.touches[0].clientY;
+    }
+  }, {passive:true}); // passive:true — 탭 지연 제거, 버튼 응답성 최대화
+
+  // [GESTURE_QA] touchmove: 보드/비스크롤 영역만 차단. 스크롤 컨테이너는 허용.
+  document.addEventListener('touchmove', function(e){
+    if(!e.touches || !e.touches.length) { e.preventDefault(); return; }
+
+    var target = e.target;
+    if(!target || target.nodeType !== 1) { e.preventDefault(); return; }
+
+    // [GESTURE_QA] 인게임 보드: 드래그 시 화면 스크롤 완전 차단
+    if(target.closest && target.closest('#board,#s-play .board-wrap')) {
+      e.preventDefault(); return;
+    }
+
+    // [GESTURE_QA] 허용 스크롤 컨테이너: 로비/결과창 내부 스크롤 유지
+    var scrollEl = target.closest ? target.closest('.lobby-scroll,.result-scroll') : null;
+    if(!scrollEl){
+      e.preventDefault(); return;
+    }
+
+    // [GESTURE_QA] 스크롤 컨테이너 경계에서 바운스 전파 차단
+    var dy = e.touches[0].clientY - _touchStartY;
+    var atTop    = scrollEl.scrollTop <= 0;
+    var atBottom = scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 1;
+    if((dy > 0 && atTop) || (dy < 0 && atBottom)){
+      e.preventDefault();
+    }
+  }, {passive:false});
+
+})();
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Orbitron:wght@700;900&display=swap');
 
@@ -13,18 +83,75 @@
   --g:#FBBF24;--d:#67E8F9;--s:#94A3B8;--green:#4ADE80;--red:#F87171;--purple:#A78BFA;
   --white:#F1F5F9;--muted:rgba(241,245,249,0.45);--faint:rgba(241,245,249,0.08);
 }
-html,body{
-  background:#000;display:flex;justify-content:center;align-items:center;
-  min-height:100vh;font-family:'Noto Sans KR',sans-serif;
-  overflow:hidden;touch-action:none;
+html{
+  width:100%;height:100%;
+  /* 당김 새로고침, 바운스 스크롤 완전 차단 */
+  overscroll-behavior:none;
+  overflow:hidden;
+}
+body{
+  margin:0;padding:0;
+  width:100%;height:100%;
+  background:#000;
+  font-family:'Noto Sans KR',sans-serif;
+  /* [GESTURE_QA] touch-action:none 제거 — 버튼 탭 방해 없애고 개별 요소에서 제어 */
+  overscroll-behavior:none;
+  overflow:hidden;
 }
 
-/* ── 폰 프레임 ── */
+/* ── 폰 프레임 (= 게임 전체 컨테이너)
+   모바일/텔레그램: 화면 100% 채움
+   데스크탑(600px+): 중앙 고정 프레임 ── */
 .phone{
-  width:390px;height:760px;background:var(--bg);
-  border-radius:36px;border:1.5px solid rgba(255,255,255,0.08);
-  box-shadow:0 0 0 8px #111,0 40px 100px rgba(0,0,0,0.8);
-  overflow:hidden;position:relative;display:flex;flex-direction:column;
+  /* position:fixed — 스크롤/스와이프에도 절대 움직이지 않음 */
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  width:100%;
+  /* 높이: TG viewportStableHeight → dvh → vh 순 fallback */
+  height:100vh;
+  height:100dvh;
+  height:var(--tg-viewport-stable-height, 100dvh);
+
+  background:var(--bg);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+
+  /* 노치/홈 인디케이터/Dynamic Island 여백 */
+  padding-top:env(safe-area-inset-top, 0px);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+  padding-left:env(safe-area-inset-left, 0px);
+  padding-right:env(safe-area-inset-right, 0px);
+
+  border-radius:0;
+  border:none;
+  box-shadow:none;
+  overscroll-behavior:none;
+}
+
+/* 데스크탑/태블릿 가로 600px 초과: 중앙 프레임 */
+@media(min-width:600px){
+  body{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#111;
+    overflow:auto; /* 데스크탑은 body 스크롤 허용 */
+  }
+  .phone{
+    position:relative; /* 데스크탑은 fixed 불필요 */
+    top:auto;left:auto;right:auto;bottom:auto;
+    width:390px;
+    max-width:390px;
+    height:min(800px, 95dvh);
+    border-radius:36px;
+    border:1.5px solid rgba(255,255,255,0.08);
+    box-shadow:0 0 0 8px #1a1a1a,0 40px 100px rgba(0,0,0,0.8);
+    padding-top:0;
+    padding-bottom:0;
+    padding-left:0;
+    padding-right:0;
+  }
 }
 
 /* ── Screen Shake (요구사항 3 + 파트1-4) ── */
@@ -53,50 +180,81 @@ html,body{
   background:radial-gradient(ellipse 70% 35% at 50% 0%,rgba(251,191,36,0.05),transparent 60%),
              radial-gradient(ellipse 40% 40% at 80% 85%,rgba(139,92,246,0.04),transparent 60%);
 }
-.lobby-inner{position:relative;z-index:1;padding:24px 22px 0;display:flex;flex-direction:column;flex:1;}
-.lobby-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;}
+.lobby-inner{
+  position:relative;z-index:1;
+  display:flex;flex-direction:column;flex:1;
+  overflow:hidden; /* 자체는 hidden, 내부 scroll-area가 스크롤 담당 */
+}
+/* 스크롤 없이 한 화면에 — flex 컬럼 + clamp 자동 압축 */
+.lobby-scroll{
+  flex:1;
+  overflow:hidden;          /* 스크롤 제거 */
+  -webkit-overflow-scrolling:touch;
+  padding:clamp(12px,2.5vh,24px) 22px clamp(8px,1.5vh,16px);
+  display:flex;
+  flex-direction:column;
+  gap:clamp(8px,1.4vh,14px);
+  overscroll-behavior:contain;
+  transform:translateZ(0);
+  contain:layout style;
+}
+/* 버튼 고정 영역 — 스크롤과 분리, 항상 하단 */
+.lobby-footer{
+  padding:0 22px clamp(10px,2.5vh,20px);
+  flex-shrink:0;
+}
+.lobby-header{display:flex;align-items:center;justify-content:center;margin-bottom:0;}
 .lobby-title{
-  font-family:'Orbitron',monospace;font-size:20px;font-weight:900;letter-spacing:0.5px;
-  background:linear-gradient(135deg,#FBBF24,#F59E0B);
+  font-family:'Orbitron',monospace;font-size:26px;font-weight:900;letter-spacing:1px;
+  background:linear-gradient(135deg,#FFE066 0%,#FFD700 40%,#F59E0B 70%,#D97706 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:none;
+  filter:drop-shadow(0 2px 6px rgba(251,191,36,0.35));
 }
 .lobby-plays{
   background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
   border-radius:100px;padding:5px 12px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);
 }
 .tier-card{
-  background:linear-gradient(165deg,#111a2e 0%,#0d1424 100%);
-  border:1px solid rgba(255,255,255,0.06);border-radius:20px;
-  padding:20px;text-align:center;margin-bottom:16px;position:relative;overflow:hidden;
+  background:linear-gradient(165deg,#0c1222 0%,#080e1a 100%);
+  border:1px solid rgba(255,255,255,0.08);border-radius:20px;
+  padding:clamp(12px,2.2vh,20px);text-align:center;
+  margin-bottom:0;          /* gap으로 대체 */
+  position:relative;overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 4px 24px rgba(0,0,0,0.5);
+  flex-shrink:0;
 }
 .tier-card::before{
-  content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(251,191,36,0.3),transparent);
+  content:'';position:absolute;top:0;left:15%;right:15%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(251,191,36,0.45),transparent);
 }
-.tier-emoji{font-size:36px;display:block;margin-bottom:8px;animation:float 3s ease-in-out infinite;}
-.tier-name{font-size:16px;font-weight:900;color:var(--white);margin-bottom:8px;letter-spacing:-0.2px;}
+.tier-emoji{font-size:clamp(22px,4.5vh,36px);display:block;margin-bottom:clamp(4px,0.8vh,8px);animation:float 3s ease-in-out infinite;}
+.tier-name{font-size:clamp(13px,3.2vw,16px);font-weight:900;color:var(--white);margin-bottom:clamp(4px,0.8vh,8px);letter-spacing:-0.2px;}
 .tier-goal{
-  font-size:12px;font-weight:700;
+  font-size:11px;font-weight:700;
   background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.15);
-  border-radius:10px;padding:7px 14px;color:var(--g);display:inline-block;
+  border-radius:10px;padding:clamp(4px,0.8vh,7px) 14px;color:var(--g);display:inline-block;
 }
-.tier-sub{font-size:10px;color:rgba(255,255,255,0.3);margin-top:8px;line-height:1.5;}
+.tier-sub{font-size:10px;color:rgba(255,255,255,0.38);margin-top:clamp(4px,0.8vh,8px);line-height:1.4;}
+/* ── 2군: 광고 카드 ── */
 .ad-card{
-  background:linear-gradient(165deg,#110e24 0%,#140f2e 100%);
-  border:1px solid rgba(139,92,246,0.15);border-radius:18px;
-  padding:16px;margin-bottom:16px;
+  background:rgba(14,18,32,0.62);
+  border:1px solid rgba(100,80,200,0.20);border-radius:18px;
+  padding:clamp(10px,2vh,16px);margin-bottom:0;
+  text-align:center;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);flex-shrink:0;
 }
 .ad-card.pulse{animation:borderPulse 2s ease-in-out infinite;}
-@keyframes borderPulse{0%,100%{border-color:rgba(139,92,246,0.15);}50%{border-color:rgba(139,92,246,0.35);}}
-.ad-row{display:flex;align-items:center;gap:12px;}
+@keyframes borderPulse{0%,100%{opacity:0.85;}50%{opacity:1;}}
+.ad-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:0;max-width:320px;margin-left:auto;margin-right:auto;width:100%;}
 .ad-icon{
   width:40px;height:40px;border-radius:12px;flex-shrink:0;
-  background:rgba(139,92,246,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;
-  border:1px solid rgba(139,92,246,0.15);
+  background:rgba(139,92,246,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;
+  border:1px solid rgba(139,92,246,0.2);
 }
-.ad-text{flex:1;}
-.ad-title{font-size:13px;font-weight:700;color:var(--white);}
-.ad-sub{font-size:10px;color:rgba(139,92,246,0.6);margin-top:2px;}
+.ad-text{flex:1;text-align:center;}
+.ad-title{font-size:14px;font-weight:800;color:var(--white);letter-spacing:-0.2px;}
+.ad-sub{font-size:11px;color:rgba(200,190,255,0.55);margin-top:3px;font-weight:600;text-align:center;}
 /* 토글 */
 .tgl{
   width:46px;height:24px;border-radius:100px;
@@ -110,112 +268,219 @@ html,body{
 }
 .tgl.on .tgl-k{left:24px;background:#fff;}
 .ad-hint{
-  font-size:10px;padding:7px 10px;border-radius:8px;margin-top:10px;
-  background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.08);
-  color:rgba(167,139,250,0.65);line-height:1.5;
+  font-size:11px;padding:clamp(5px,1vh,8px) 12px;border-radius:8px;margin-top:clamp(6px,1.2vh,12px);
+  background:rgba(14,100,160,0.18);border:1px solid rgba(56,180,255,0.28);
+  color:rgba(120,210,255,0.90);line-height:1.5;font-weight:600;
+  text-align:center;
 }
-/* ── 게임 가이드 카드 ── */
+/* ── 3군: 게임 가이드 카드 ── */
 .guide-card{
-  background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-  border-radius:18px;padding:18px 20px;margin-bottom:16px;
+  background:rgba(255,255,255,0.018);border:1px solid rgba(255,255,255,0.05);
+  border-radius:18px;padding:clamp(10px,2vh,16px);margin-bottom:0;
+  text-align:center;flex:1;min-height:0;
+  display:flex;flex-direction:column;justify-content:flex-start;
+  align-items:center;
 }
 .guide-title{
-  font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);
-  letter-spacing:1.5px;margin-bottom:14px;text-transform:uppercase;
+  font-size:11px;font-weight:800;color:rgba(251,191,36,0.85);
+  letter-spacing:2px;margin-bottom:clamp(6px,1.2vh,14px);text-transform:uppercase;
 }
-.guide-section{display:flex;flex-direction:column;gap:9px;}
-.guide-row{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:rgba(255,255,255,0.6);line-height:1.6;}
-.guide-dot{font-size:13px;flex-shrink:0;width:20px;text-align:center;}
-.guide-dot.tip{font-size:12px;}
+.guide-section{
+  display:flex;flex-direction:column;gap:clamp(4px,1vh,10px);
+  width:100%;max-width:240px;  /* 고정폭 블록으로 행들의 좌측 기준 통일 */
+}
+.guide-row{
+  display:flex;align-items:center;justify-content:center;
+  gap:10px;font-size:clamp(12px,3.2vw,13px);font-weight:600;
+  color:rgba(255,255,255,0.78);line-height:1.4;
+}
+.guide-dot{font-size:16px;flex-shrink:0;width:22px;text-align:center;}
+.guide-dot.tip{font-size:15px;}
 .guide-label{
-  font-size:10px;font-weight:700;color:rgba(251,191,36,0.7);letter-spacing:1.5px;
+  font-size:11px;font-weight:800;color:rgba(251,191,36,0.85);letter-spacing:2px;
   margin-bottom:4px;text-transform:uppercase;
+  width:100%;text-align:center;  /* max-width 블록 기준 중앙 */
 }
 .guide-divider{
-  height:1px;background:rgba(255,255,255,0.04);margin:14px 0;
+  height:1px;background:rgba(255,255,255,0.06);margin:clamp(6px,1.2vh,12px) 0;
+  width:100%;
 }
 .start-btn{
-  width:100%;padding:18px;border-radius:16px;border:none;
-  background:linear-gradient(135deg,#FBBF24,#F59E0B);color:#000;
+  width:100%;padding:clamp(14px,2.5vh,18px);border-radius:16px;border:none;
+  background:linear-gradient(135deg,#FFD700,#F59E0B,#D97706);color:#0a0800;
   font-size:15px;font-weight:900;font-family:'Noto Sans KR',sans-serif;
   cursor:pointer;position:relative;overflow:hidden;
-  box-shadow:0 2px 16px rgba(251,191,36,0.25);transition:transform .1s;
-  margin-top:auto;margin-bottom:20px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.30),0 4px 20px rgba(200,140,0,0.35);
+  text-shadow:0 1px 2px rgba(80,40,0,0.4);
+  transition:transform .1s;display:block;
 }
 .start-btn::after{
   content:'';position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.14),transparent);
   transform:translateX(-100%);animation:sweep 3s ease infinite;
 }
 .start-btn:active{transform:scale(.97);}
 
 /* ════════════════════════════════════
-   인게임 HUD (파트1 요구사항 4)
-   SCORE 최상단 정중앙, TIME 바로 아래
+   인게임 HUD — 리디자인
+   판수/콤보 → 스코어 → 타임바+시간
+   겹침 없음 · TIME 크고 선명하게
 ════════════════════════════════════ */
-#s-play{background:#060810;transition:background .5s ease;}
-#s-play.fever-mode{background:linear-gradient(160deg,#120820,#080414);}
+#s-play{background:#060810;touch-action:none;user-select:none;}
+#s-play.fever-mode{background:#060810;} /* 배경 고정, fever 분위기는 board::after ambient로 */
 
-.hud{
-  display:flex;flex-direction:column;align-items:center;
-  padding:12px 20px 4px;flex-shrink:0;position:relative;z-index:10;
+/* ── HUD 전체 래퍼 ── */
+.hud-wrap{
+  padding:8px 18px 6px;flex-shrink:0;
+  position:relative;z-index:10;
+  background:linear-gradient(to bottom,#060810 85%,rgba(6,8,16,0));
 }
-.hud-score-lbl{font-size:9px;font-weight:700;color:rgba(255,255,255,0.3);letter-spacing:3px;text-transform:uppercase;}
+
+/* ── 상단 칩 바: 판수/콤보 — 3순위, 존재감 낮춤 ── */
+.hud-topbar{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:3px;
+}
+.hud-chip{display:flex;align-items:baseline;gap:4px;}
+.hud-chip-lbl{
+  font-size:8px;font-weight:700;color:rgba(255,255,255,0.20);
+  letter-spacing:1px;text-transform:uppercase;
+}
+.hud-chip-val{
+  font-family:'Orbitron',monospace;font-size:12px;font-weight:700;
+  color:rgba(255,255,255,0.42);
+}
+
+/* ── 스코어 블록 — 1순위 ── */
+.hud-score-block{text-align:center;margin-bottom:4px;}
+.hud-score-lbl{
+  font-size:7px;font-weight:700;color:rgba(255,255,255,0.16);
+  letter-spacing:4px;text-transform:uppercase;margin-bottom:0;
+}
 .hud-score{
-  font-family:'Orbitron',monospace;font-size:42px;font-weight:900;
-  color:var(--white);line-height:1.05;
-  will-change:transform;
-  transition:text-shadow .3s ease,color .3s ease;
+  font-family:'Orbitron',monospace;font-size:44px;font-weight:900;
+  color:var(--white);line-height:1.0;letter-spacing:-1.5px;
+  will-change:transform,opacity;
+  white-space:nowrap;          /* 999,999 단위에서 줄바꿈 원천 차단 */
+  text-shadow:0 2px 0 rgba(0,0,0,0.45),0 0 20px rgba(255,255,255,0.06);
 }
 #s-play.fever-mode .hud-score{
   color:var(--g);
-  text-shadow:0 0 12px rgba(251,191,36,0.25);
+  text-shadow:0 2px 0 rgba(0,0,0,0.45),0 0 16px rgba(251,191,36,0.18);
 }
-.hud-score.bump{animation:scoreBump .18s ease;}
-.hud-time-row{display:flex;align-items:center;gap:8px;margin-top:1px;}
-.hud-time-lbl{font-size:9px;font-weight:700;color:rgba(255,255,255,0.3);letter-spacing:1.5px;}
+#s-play.last-rush-mode .hud-score{
+  color:rgba(251,191,36,0.96);
+  text-shadow:0 2px 0 rgba(0,0,0,0.45),0 0 14px rgba(251,191,36,0.12);
+}
+
+/* ── Toss 스타일 스코어 모션 ── */
+@keyframes scoreSlide{
+  0%  {transform:translateY(7px);opacity:0.3;}
+  65% {transform:translateY(-1px);opacity:1;}
+  100%{transform:translateY(0);opacity:1;}
+}
+@keyframes scoreSlideHigh{
+  0%  {transform:translateY(7px);opacity:0.3;}
+  65% {transform:translateY(-1px);opacity:1;}
+  100%{transform:translateY(0);opacity:1;}
+}
+@keyframes scoreSlideFever{
+  0%  {transform:translateY(7px);opacity:0.3;}
+  65% {transform:translateY(-1px);opacity:1;}
+  100%{transform:translateY(0);opacity:1;}
+}
+.hud-score.bump      {animation:scoreSlide      .28s cubic-bezier(0.22,1,0.36,1) forwards;}
+.hud-score.bump-high {animation:scoreSlideHigh  .28s cubic-bezier(0.22,1,0.36,1) forwards;}
+.hud-score.bump-fever{animation:scoreSlideFever .28s cubic-bezier(0.22,1,0.36,1) forwards;}
+
+/* ── 타임 블록 — 2순위 ── */
+.hud-time-block{padding:0 1px;}
+.hud-time-row{display:flex;align-items:center;gap:6px;}
+.hud-time-lbl{
+  font-size:7px;font-weight:700;color:rgba(255,255,255,0.26);
+  letter-spacing:1.5px;text-transform:uppercase;flex-shrink:0;
+}
+/* 타임바 — 4px, 채움 색 대비 최대화 */
+.hud-timebar-wrap{
+  flex:1;height:4px;background:rgba(255,255,255,0.07);
+  border-radius:4px;overflow:hidden;
+}
+.hud-timebar-fill{
+  height:100%;width:100%;border-radius:4px;
+  background:var(--d);
+  box-shadow:0 0 6px rgba(103,232,249,0.35);
+  transition:width 0.92s linear;
+}
+/* 타임 숫자 */
 .hud-time{
-  font-family:'Orbitron',monospace;font-size:18px;font-weight:900;
-  color:var(--s);min-width:46px;text-align:center;
+  font-family:'Orbitron',monospace;font-size:30px;font-weight:900;
+  color:rgba(255,255,255,0.98);min-width:42px;text-align:right;
+  flex-shrink:0;letter-spacing:-0.5px;
+  text-shadow:0 1px 0 rgba(0,0,0,0.4);
 }
-.hud-time.urgent{color:var(--red);animation:tick .45s ease-in-out infinite;}
-/* 좌우 보조 */
-.hud-sides{
-  position:absolute;top:10px;left:16px;right:16px;
-  display:flex;justify-content:space-between;align-items:center;pointer-events:none;
+.hud-time-unit{
+  font-size:9px;font-weight:700;color:rgba(255,255,255,0.26);
+  letter-spacing:0.5px;flex-shrink:0;padding-bottom:2px;
 }
-.hud-side{display:flex;flex-direction:column;align-items:center;}
-.hud-side-lbl{font-size:8px;font-weight:700;color:rgba(255,255,255,0.25);letter-spacing:1px;text-transform:uppercase;}
-.hud-side-val{font-size:12px;font-weight:900;color:rgba(255,255,255,0.6);font-family:'Orbitron',monospace;}
+/* Toss 스타일 타임 틱 */
+@keyframes timeTick{
+  0%  {opacity:0.4;transform:translateY(4px);}
+  70% {opacity:1;  transform:translateY(-0.5px);}
+  100%{opacity:1;  transform:translateY(0);}
+}
+.hud-time.tick{animation:timeTick .28s cubic-bezier(0.22,1,0.36,1);}
+
+/* urgent / last-rush */
+.hud-time.last-rush{color:#FBBF24;animation:lastRushPulse 1.2s ease-in-out infinite;}
+.hud-time.urgent   {color:var(--red);animation:tick .45s ease-in-out infinite;}
 
 /* 콤보 스트립 (단계별 색상·크기 차등) */
 .combo-strip{
-  height:24px;display:flex;align-items:center;justify-content:center;
-  font-size:12px;font-weight:900;color:rgba(167,139,250,0.8);flex-shrink:0;
-  opacity:0;transition:opacity .2s,font-size .15s,color .15s;
+  height:20px;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:900;color:rgba(167,139,250,0.8);flex-shrink:0;
+  opacity:0;transition:opacity .2s;
   letter-spacing:0.5px;
 }
 .combo-strip.show{opacity:1;}
-.combo-strip.c3{color:rgba(245,158,11,0.85);font-size:13px;}
-.combo-strip.c4{color:rgba(239,68,68,0.85);font-size:15px;animation:comboShake .25s ease;}
-.combo-strip.c5{color:rgba(251,191,36,0.9);font-size:17px;animation:comboMax .3s cubic-bezier(.25,1.4,.55,1);}
-@keyframes comboShake{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
-@keyframes comboMax{0%{transform:scale(.6);opacity:0;}50%{transform:scale(1.3);}100%{transform:scale(1);opacity:1;}}
+.combo-strip.c3{color:rgba(245,158,11,0.85);font-size:12px;}
+.combo-strip.c4{color:rgba(239,68,68,0.90);font-size:14px;font-weight:900;animation:comboShake .25s ease;}
+.combo-strip.c5{color:rgba(251,191,36,0.95);font-size:16px;font-weight:900;animation:comboMax .28s cubic-bezier(0.22,1,0.36,1);}
+/* Last Rush 중 콤보 — 골드+더 또렷하게 (opacity만, scale 없음) */
+.last-rush-mode .combo-strip.c3{color:rgba(251,191,36,0.90);opacity:1;}
+.last-rush-mode .combo-strip.c4{color:rgba(251,191,36,0.95);font-size:15px;}
+.last-rush-mode .combo-strip.c5{color:#FFD700;font-size:17px;text-shadow:0 1px 3px rgba(0,0,0,0.6);}
+@keyframes comboShake{0%,100%{transform:translateX(0);}25%{transform:translateX(-2px);}75%{transform:translateX(2px);}}
+@keyframes comboMax{0%{transform:scale(.7);opacity:0;}55%{transform:scale(1.08);}100%{transform:scale(1);opacity:1;}}
 
 /* 피버 배너 */
 .fever-banner{
-  position:absolute;top:110px;left:0;right:0;z-index:20;
+  position:absolute;top:162px;left:0;right:0;z-index:20;
   text-align:center;pointer-events:none;
-  opacity:0;transform:scale(.8) translateY(-6px);transition:all .3s;
+  opacity:0;transform:scale(.8) translateY(-6px);
+  transition:opacity .3s,transform .3s;
+  transform-origin:center top;
 }
 .fever-banner.on{opacity:1;transform:scale(1) translateY(0);}
-.fever-text{
-  font-family:'Orbitron',monospace;font-size:18px;font-weight:900;
-  background:linear-gradient(90deg,#FBBF24,#F59E0B,#FBBF24);
-  background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  animation:goldShimmer 1.5s linear infinite;letter-spacing:1.5px;
+
+/* 텍스트 전체 래퍼 — 커졌다 작아지는 pulse */
+@keyframes feverPulse{
+  0%,100%{transform:scale(1);}
+  50%     {transform:scale(1.07);}
 }
-.fever-sub{font-size:10px;color:rgba(251,191,36,0.6);font-weight:700;margin-top:3px;}
+/* 글로우 pulse — filter로 빛 처리 */
+@keyframes feverGlow{
+  0%,100%{filter:drop-shadow(0 0 3px rgba(251,191,36,0.2)) drop-shadow(0 0 8px rgba(251,191,36,0.08));}
+  50%    {filter:drop-shadow(0 0 7px rgba(251,191,36,0.4)) drop-shadow(0 0 14px rgba(251,191,36,0.18));}
+}
+.fever-banner.on .fever-text{
+  font-family:'Orbitron',monospace;font-size:20px;font-weight:900;
+  background:linear-gradient(90deg,#FFD60A,#FBBF24,#F59E0B,#FBBF24,#FFD60A);
+  background-size:300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  /* 유지 상태: shimmer 하나만 — pulse/glow 반복 제거 (저사양 GPU 부하 감소) */
+  animation:goldShimmer 1.8s linear infinite;
+  letter-spacing:2px;display:inline-block;
+}
+.fever-sub{font-size:11px;color:rgba(251,191,36,0.65);font-weight:700;margin-top:4px;letter-spacing:0.3px;}
 
 /* ════════════════════════════════════
    보드 — 풀스크린 그리드 (파트1 요구사항 4)
@@ -228,99 +493,109 @@ html,body{
   display:grid;
   grid-template-columns:repeat(7,1fr);
   gap:4px;
-  width:calc(100% - 0px);
+  width:100%;
   max-width:378px;
+  touch-action:none;    /* 보드 위 모든 터치 기본 동작(스크롤/줌) 차단 */
+  user-select:none;
 }
 
 /* ════════════════════════════════════
    셀 공통 (파트1-4: will-change 하드웨어 가속)
 ════════════════════════════════════ */
+/* ── 모션 이징 토큰 (duration 변경 없음 — JS 상수와 충돌 방지) ── */
+:root{
+  --ease-snap:cubic-bezier(0.22,1,0.36,1);
+  --ease-settle:cubic-bezier(0.25,1,0.5,1);
+  --ease-weight:cubic-bezier(0.2,0.8,0.3,1);
+}
+
 .cell{
   aspect-ratio:1;border-radius:14px;
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;position:relative;overflow:hidden;
-  /* 파트1-4: GPU 레이어 승격 */
   will-change:transform,opacity;
-  /* 파트2-7: 입체감 있는 inset shadow, blur 축소 */
+  contain:layout style;
   box-shadow:
-    inset 0 2px 0 rgba(255,255,255,0.22),
-    inset 0 -2px 0 rgba(0,0,0,0.3),
-    0 3px 6px rgba(0,0,0,0.35);
+    inset 0 2.5px 0 rgba(255,255,255,0.22),
+    inset 0 -2.5px 0 rgba(0,0,0,0.34),
+    0 3px 6px rgba(0,0,0,0.36);
   border:1.5px solid transparent;
   user-select:none;touch-action:none;
-  outline:1.5px solid rgba(0,0,0,0.2);outline-offset:-1.5px;
-  transition:transform .12s cubic-bezier(.25,1.4,.55,1);
+  transition:transform .10s var(--ease-snap);
 }
-.cell:active{transform:scale(0.92);}
+.cell:active{
+  transform:scale(0.94);
+  transition:transform .04s ease-out;
+}
 .cell svg{width:84%;height:84%;display:block;overflow:visible;}
 
-/* ════════════════════════════════════
-   파트2-5 & 파트2-6: 5가지 테마 감자
-   p0 빨강/불  p1 시안/얼음  p2 초록/독
-   p3 노랑/번개  p4 마젠타/마법
-════════════════════════════════════ */
+/* p0 빨강 — 0°, 비비드 크림슨 */
 .p0{
-  background:linear-gradient(145deg,#6b1515,#c42828,#e84545);
-  border-color:rgba(232,69,69,0.3);
-  box-shadow:inset 0 2px 0 rgba(255,150,150,0.18),inset 0 -2px 0 rgba(0,0,0,0.3),0 2px 6px rgba(196,40,40,0.2);
+  background:linear-gradient(145deg,#3a0808,#b81818,#e02828,#ff4040);
+  border-color:rgba(255,64,64,0.55);
+  box-shadow:inset 0 2.5px 0 rgba(255,180,180,0.24),inset 0 -2.5px 0 rgba(0,0,0,0.52),0 3px 8px rgba(180,10,10,0.38);
 }
+/* p1 시안 — 190°, 최고 밝기: 초록(130°)과 60°, 보라(270°)와 80° 간격 */
 .p1{
-  background:linear-gradient(145deg,#0e4d5e,#18a5c8,#4dd4e8);
-  border-color:rgba(77,212,232,0.3);
-  box-shadow:inset 0 2px 0 rgba(186,230,253,0.2),inset 0 -2px 0 rgba(0,0,0,0.3),0 2px 6px rgba(24,165,200,0.2);
+  background:linear-gradient(145deg,#063040,#0898b8,#18c8e0,#50eeff);
+  border-color:rgba(80,238,255,0.68);
+  box-shadow:inset 0 2.5px 0 rgba(200,252,255,0.50),inset 0 -2.5px 0 rgba(0,0,0,0.28),0 3px 6px rgba(10,160,200,0.42);
 }
+/* p2 초록 — 130°, 채도 높은 에메랄드 */
 .p2{
-  background:linear-gradient(145deg,#0b4f2a,#159244,#30c468);
-  border-color:rgba(48,196,104,0.3);
-  box-shadow:inset 0 2px 0 rgba(187,247,208,0.18),inset 0 -2px 0 rgba(0,0,0,0.3),0 2px 6px rgba(21,146,68,0.2);
+  background:linear-gradient(145deg,#082c14,#107838,#1ca84e,#28cc60);
+  border-color:rgba(40,204,96,0.55);
+  box-shadow:inset 0 2.5px 0 rgba(160,255,190,0.30),inset 0 -2.5px 0 rgba(0,0,0,0.42),0 3px 6px rgba(12,130,50,0.34);
 }
+/* p3 노랑 — 45°, 고채도 앰버-옐로 */
 .p3{
-  background:linear-gradient(145deg,#8a5f00,#dab318,#edc932);
-  border-color:rgba(237,201,50,0.35);
-  box-shadow:inset 0 2px 0 rgba(255,230,120,0.2),inset 0 -2px 0 rgba(0,0,0,0.25),0 2px 6px rgba(218,179,24,0.2);
+  background:linear-gradient(145deg,#5a3800,#b88000,#e0a810,#ffd020);
+  border-color:rgba(255,208,32,0.68);
+  box-shadow:inset 0 2.5px 0 rgba(255,248,160,0.50),inset 0 -2.5px 0 rgba(0,0,0,0.28),0 3px 6px rgba(200,150,10,0.42);
 }
+/* p4 보라 — 270°, 일렉트릭 바이올렛 */
 .p4{
-  background:linear-gradient(145deg,#7d2a6c,#cc4da5,#e868be);
-  border-color:rgba(232,104,190,0.3);
-  box-shadow:inset 0 2px 0 rgba(255,200,230,0.18),inset 0 -2px 0 rgba(0,0,0,0.3),0 2px 6px rgba(204,77,165,0.2);
+  background:linear-gradient(145deg,#1e0858,#5010a8,#7830c8,#9850e0);
+  border-color:rgba(152,80,224,0.68);
+  box-shadow:inset 0 2.5px 0 rgba(220,180,255,0.40),inset 0 -2.5px 0 rgba(0,0,0,0.48),0 3px 8px rgba(100,30,200,0.42);
 }
 
-/* ════════════════════════════════════
-   폭탄/무지개 특수 감자 (파트2-7 재디자인)
-════════════════════════════════════ */
 .p-bomb{
-  background:radial-gradient(circle at 38% 32%,#e06610,#6b1a1a,#0f172a);
-  border-color:rgba(224,102,16,0.4);
-  box-shadow:inset 0 2px 0 rgba(255,180,80,0.18),inset 0 -2px 0 rgba(0,0,0,0.4),
-    0 0 8px rgba(224,102,16,0.35);
-  animation:bombGlow 1.2s ease-in-out infinite;
+  background:radial-gradient(circle at 35% 28%,#2a2d38,#181a24,#0c0e16);
+  border-color:rgba(248,156,32,0.28);
+  box-shadow:inset 0 2.5px 0 rgba(255,255,255,0.10),inset 0 -2.5px 0 rgba(0,0,0,0.55),0 3px 8px rgba(0,0,0,0.40);
+  animation:bombBreath 2s ease-in-out infinite;
 }
-@keyframes bombGlow{0%,100%{box-shadow:inset 0 2px 0 rgba(255,180,80,0.18),inset 0 -2px 0 rgba(0,0,0,0.4),0 0 8px rgba(224,102,16,0.35);}50%{box-shadow:inset 0 2px 0 rgba(255,180,80,0.18),inset 0 -2px 0 rgba(0,0,0,0.4),0 0 14px rgba(224,102,16,0.5);}}
-
+@keyframes bombBreath{
+  0%,100%{filter:brightness(1);}
+  50%{filter:brightness(1.14);}
+}
+/* rainbow — pearl/silver 희귀감 유지하되 상단 하이라이트 강화 */
 .p-rainbow{
-  background:linear-gradient(145deg,#d4dae0,#f0f0f0,#bcc4cc);
-  border-color:rgba(255,255,255,0.4);
-  box-shadow:inset 0 2px 0 rgba(255,255,255,0.3),inset 0 -2px 0 rgba(0,0,0,0.12),
-    0 0 8px rgba(255,255,255,0.15);
-  animation:rainbowSpin 4s linear infinite;
+  background:linear-gradient(145deg,#c0ccd8,#dce8f0,#eef4f8,#d4dce8);
+  border-color:rgba(255,255,255,0.55);
+  box-shadow:inset 0 2.5px 0 rgba(255,255,255,0.42),inset 0 -2.5px 0 rgba(0,0,0,0.16),0 3px 8px rgba(120,140,180,0.26);
+  animation:rainbowBreath 3.5s ease-in-out infinite;
 }
-@keyframes rainbowSpin{0%{box-shadow:inset 0 2px 0 rgba(255,255,255,0.3),inset 0 -2px 0 rgba(0,0,0,0.12),0 0 8px rgba(220,60,60,0.15);}33%{box-shadow:inset 0 2px 0 rgba(255,255,255,0.3),inset 0 -2px 0 rgba(0,0,0,0.12),0 0 8px rgba(50,110,220,0.15);}66%{box-shadow:inset 0 2px 0 rgba(255,255,255,0.3),inset 0 -2px 0 rgba(0,0,0,0.12),0 0 8px rgba(120,80,220,0.15);}100%{box-shadow:inset 0 2px 0 rgba(255,255,255,0.3),inset 0 -2px 0 rgba(0,0,0,0.12),0 0 8px rgba(220,60,60,0.15);}}
+@keyframes rainbowBreath{
+  0%,100%{opacity:1;}
+  50%{opacity:0.84;}
+}
 
 /* ── 셀 상태 ── */
 .cell.selected{
-  transform:scale(1.1) translateY(-3px);
-  border-color:rgba(255,255,255,0.8)!important;
-  box-shadow:0 0 0 1.5px rgba(255,255,255,0.45),0 6px 14px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.3)!important;
+  transform:scale(1.06) translateY(-2px);
+  border-color:rgba(255,255,255,0.7)!important;
+  box-shadow:0 0 0 1px rgba(255,255,255,0.35),0 5px 12px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.25)!important;
   z-index:10;
 }
 
-/* 폭발 (파트1 요구사항 1: cell DOM 재사용, 클래스만 토글) */
+/* 폭발: scale-up 없음, 깔끔한 shrink-fade */
 @keyframes explodeCell{
-  0%{transform:scale(1);opacity:1;}
-  25%{transform:scale(1.18);opacity:0.9;}
-  100%{transform:scale(0.3);opacity:0;}
+  0%  {transform:scale(1);opacity:1;}
+  100%{transform:scale(0.2);opacity:0;}
 }
-.cell.exploding{animation:explodeCell .2s cubic-bezier(.4,0,1,.6) forwards;pointer-events:none;}
+.cell.exploding{animation:explodeCell .18s ease-in forwards;pointer-events:none;}
 
 /* 파트1-3: 스왑/실패 transition은 JS에서 직접 style 조작 */
 
@@ -328,7 +603,7 @@ html,body{
 .urgent-frame{
   position:absolute;inset:0;pointer-events:none;z-index:50;
   border:4px solid transparent;border-radius:36px;
-  transition:border-color .3s,box-shadow .3s;
+  transition:opacity .3s;
 }
 .urgent-frame.on{
   border-color:rgba(248,113,113,0.4);
@@ -336,19 +611,96 @@ html,body{
 }
 @keyframes frameBlink{0%,100%{opacity:0.6;}50%{opacity:0.2;}}
 
-.play-bottom{padding:6px 16px 12px;flex-shrink:0;}
+/* ── Last Rush 구간 (10~6초): 조용한 amber 압력감 ── */
+.hud-time.last-rush{
+  color:#FBBF24;
+  animation:lastRushPulse 0.85s ease-in-out infinite;  /* 1.2s→0.85s: 더 긴박 */
+}
+@keyframes lastRushPulse{
+  0%,100%{opacity:1;}
+  50%{opacity:0.52;}   /* 0.6→0.52: 더 강한 깜빡임 */
+}
+/* Last Rush 중 tick — 더 날카로운 snap */
+.last-rush-mode .hud-time.tick{
+  animation:timeTick .20s cubic-bezier(0.22,1,0.36,1);  /* .28s→.20s */
+}
+.urgent-frame.last-rush{
+  border-color:rgba(251,191,36,0.25);
+  border-radius:36px;
+  animation:lastRushFrame 1.6s ease-in-out infinite;  /* 2s→1.6s */
+}
+@keyframes lastRushFrame{
+  0%,100%{opacity:0.60;}
+  50%{opacity:0.15;}
+}
+
+.play-bottom{padding:6px 16px 12px;flex-shrink:0;display:flex;gap:8px;align-items:center;}
+/* ── 포기 확인 오버레이 ── */
+.quit-overlay{
+  position:absolute;inset:0;z-index:120;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.82);
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.quit-overlay.on{opacity:1;pointer-events:all;}
+
+/* 보드 블러 — 포기창 열릴 때 블록 위치 숨김 */
+.board-wrap.blurred .board{
+  filter:blur(12px);
+  pointer-events:none;
+  transition:filter .2s;
+}
+.quit-popup{
+  background:linear-gradient(165deg,#0e1428 0%,#080e1a 100%);
+  border:1px solid rgba(255,255,255,0.10);border-radius:24px;
+  padding:28px 24px 22px;text-align:center;width:280px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 8px 32px rgba(0,0,0,0.6);
+  animation:popIn .28s cubic-bezier(.25,1,.5,1);
+}
+.quit-popup-ico{font-size:36px;display:block;margin-bottom:10px;}
+.quit-popup-title{
+  font-size:17px;font-weight:900;color:var(--white);
+  margin-bottom:6px;letter-spacing:-0.3px;
+}
+.quit-popup-sub{
+  font-size:12px;color:rgba(255,255,255,0.38);
+  margin-bottom:20px;line-height:1.6;
+}
+.quit-popup-btns{display:flex;flex-direction:column;gap:8px;}
+.quit-confirm-btn{
+  width:100%;padding:13px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,#dc2626,#991b1b);
+  color:#fff;font-size:14px;font-weight:900;
+  font-family:'Noto Sans KR',sans-serif;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.quit-cancel-btn{
+  width:100%;padding:11px;border-radius:12px;border:none;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.55);font-size:13px;font-weight:700;
+  font-family:'Noto Sans KR',sans-serif;cursor:pointer;
+}
+.quit-confirm-btn:active{opacity:0.85;}
+.quit-cancel-btn:active{opacity:0.7;}
 .quit-btn{
-  width:100%;padding:11px;border-radius:14px;border:none;
+  flex:1;padding:11px;border-radius:14px;border:none;
   background:rgba(255,255,255,0.04);color:var(--muted);
   border:1px solid var(--faint);font-size:13px;font-weight:700;
   font-family:'Noto Sans KR',sans-serif;cursor:pointer;
 }
+.mute-btn{
+  flex-shrink:0;padding:10px 11px;border-radius:14px;border:1px solid var(--faint);
+  background:rgba(255,255,255,0.04);font-size:15px;cursor:pointer;
+  line-height:1;transition:background .15s;
+}
+.mute-btn:active{background:rgba(255,255,255,0.08);}
 
 /* 연장 팝업 */
 .overlay{
   position:absolute;inset:0;z-index:100;
   display:flex;align-items:center;justify-content:center;
-  background:rgba(0,0,0,0.72);backdrop-filter:blur(5px);
+  background:rgba(0,0,0,0.72);
   opacity:0;pointer-events:none;transition:opacity .3s;
 }
 .overlay.on{opacity:1;pointer-events:all;}
@@ -381,119 +733,214 @@ html,body{
 ════════════════════════════════════ */
 #s-result{background:linear-gradient(170deg,#0c1020 0%,#070a14 100%);}
 .result-inner{
-  padding:16px 18px 12px;display:flex;flex-direction:column;flex:1;overflow:hidden;
-  opacity:0;transform:translateY(30px);
-  transition:opacity .5s cubic-bezier(.25,1,.5,1),transform .5s cubic-bezier(.25,1,.5,1);
+  display:flex;flex-direction:column;flex:1;overflow:hidden;
+  opacity:0;transform:translateY(24px);
+  transition:opacity .38s cubic-bezier(.25,1,.5,1),transform .38s cubic-bezier(.25,1,.5,1);
 }
 .result-inner.show{opacity:1;transform:translateY(0);}
+/* 스크롤 가능한 콘텐츠 */
+.result-scroll{
+  flex:1;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  padding:16px 18px 8px;
+  display:flex;flex-direction:column;
+  overscroll-behavior:contain;
+  transform:translateZ(0);
+  contain:layout style;
+}
+/* 순차 등장 */
+.result-inner.show .result-score-card{animation:resCardIn .34s cubic-bezier(.25,1,.5,1) .05s both;}
+.result-inner.show .result-hl-card  {animation:resCardIn .34s cubic-bezier(.25,1,.5,1) .12s both;}
+.result-inner.show .result-meta-card{animation:resCardIn .34s cubic-bezier(.25,1,.5,1) .19s both;}
+.result-inner.show .result-actions  {animation:resCardIn .30s cubic-bezier(.25,1,.5,1) .25s both;}
+@keyframes resCardIn{
+  0%  {opacity:0;transform:translateY(6px);}
+  100%{opacity:1;transform:translateY(0);}
+}
+
 .result-title{
-  font-family:'Orbitron',monospace;font-size:18px;font-weight:900;text-align:center;
-  background:linear-gradient(135deg,#FBBF24 20%,#F59E0B 80%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  margin-bottom:12px;letter-spacing:0.5px;
+  font-size:9px;font-weight:700;text-align:center;
+  color:rgba(255,255,255,0.25);letter-spacing:3px;text-transform:uppercase;
+  margin-bottom:10px;
 }
 .result-score-card{
-  background:linear-gradient(165deg,#141d32 0%,#0e1525 100%);
-  border:1px solid rgba(255,255,255,0.06);border-radius:18px;
-  padding:14px 16px;text-align:center;margin-bottom:10px;position:relative;overflow:hidden;
+  background:linear-gradient(165deg,#0a1020 0%,#060c18 100%);
+  border:1px solid rgba(255,255,255,0.08);border-radius:18px;
+  padding:14px 16px;text-align:center;margin-bottom:8px;position:relative;overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 4px 28px rgba(0,0,0,0.6);
 }
 .result-score-card::before{
-  content:'';position:absolute;top:0;left:15%;right:15%;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(251,191,36,0.35),transparent);
+  content:'';position:absolute;top:0;left:10%;right:10%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(251,191,36,0.55),transparent);
 }
-.res-base{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:0.5px;}
+.res-base{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,0.38);margin-bottom:4px;letter-spacing:0.5px;}
 .res-buff{
   display:none;align-items:center;justify-content:center;gap:5px;
-  background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);
+  background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.18);
   border-radius:8px;padding:4px 10px;margin:6px auto 0;
   font-size:10px;font-weight:700;color:var(--purple);animation:stampIn .4s ease;width:fit-content;
 }
 .res-buff.show{display:flex;}
+.res-final-wrap{display:flex;align-items:baseline;justify-content:center;gap:4px;}
 .res-final{
   font-family:'Orbitron',monospace;font-size:42px;font-weight:900;
-  color:var(--g);line-height:1.1;
+  color:#FFD700;line-height:1.1;
+  text-shadow:0 2px 4px rgba(0,0,0,0.8),0 0 0 transparent;
   animation:countReveal .8s cubic-bezier(.25,1,.5,1);
 }
-.res-unit{font-size:14px;color:rgba(251,191,36,0.5);font-weight:700;margin-top:2px;}
-.contrib-card{
-  background:rgba(14,18,32,0.6);border:1px solid rgba(255,255,255,0.05);
-  border-radius:14px;padding:12px 14px;margin-bottom:8px;
+.res-unit{font-size:16px;color:rgba(251,191,36,0.55);font-weight:700;padding-bottom:3px;}
+/* 서버 미검증 상태 — OFFLINE/ERROR 시 점수 카드에 적용 */
+.result-score-card.unverified .res-final{color:rgba(255,255,255,0.5);}
+.result-score-card.unverified .res-unit{color:rgba(255,255,255,0.3);}
+.res-unverified-label{
+  font-size:10px;font-weight:700;letter-spacing:1px;
+  color:rgba(255,255,255,0.3);text-align:center;
+  margin-top:6px;text-transform:uppercase;
 }
-.contrib-title{font-size:9px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;}
-.contrib-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:var(--white);margin-bottom:4px;}
-.contrib-improve{font-size:13px;font-weight:900;color:var(--green);}
-.contrib-bar{height:6px;background:rgba(255,255,255,0.04);border-radius:100px;overflow:hidden;margin-bottom:4px;}
-.contrib-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,#4ADE80,#22C55E);width:0%;transition:width 1.2s cubic-bezier(.4,0,.2,1);}
-.contrib-sub{font-size:10px;color:rgba(255,255,255,0.35);}
-.result-actions{display:flex;flex-direction:column;gap:8px;margin-top:auto;padding-top:8px;}
+
+/* ── 3군: 하이라이트 카드 ── */
+.result-hl-card{
+  background:rgba(255,255,255,0.018);border:1px solid rgba(255,255,255,0.05);
+  border-radius:14px;padding:11px 14px;margin-bottom:8px;
+}
+.result-hl-title{
+  font-size:9px;font-weight:700;color:rgba(255,255,255,0.28);
+  letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;
+}
+.hl-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;font-weight:700;color:rgba(255,255,255,0.42);padding:2px 0;
+}
+.hl-val{font-weight:900;font-family:'Orbitron',monospace;font-size:14px;color:var(--white);}
+.hl-val.gold{color:var(--g);}
+.hl-val.green{color:var(--green);}
+.hl-val.purple{color:var(--purple);}
+/* 감정 트리거 — 아주 조용한 한 줄 */
+.hl-trigger{
+  margin-top:7px;padding-top:7px;
+  border-top:1px solid rgba(255,255,255,0.04);
+  font-size:10px;color:rgba(255,255,255,0.24);font-weight:700;letter-spacing:0.2px;
+}
+
+/* ── 2군: 메타 카드 ── */
+.result-meta-card{
+  background:rgba(14,18,32,0.60);border:1px solid rgba(255,255,255,0.06);
+  border-radius:14px;padding:22px 0;margin-bottom:10px;display:flex;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.result-meta-item{flex:1;text-align:center;padding:0 14px;}
+.result-meta-item+.result-meta-item{border-left:1px solid rgba(255,255,255,0.06);}
+.result-meta-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,0.28);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;}
+.result-meta-val{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;color:#FFD700;line-height:1.1;margin-bottom:4px;text-shadow:0 2px 4px rgba(0,0,0,0.7);}
+.result-meta-val.green{color:var(--green);}
+.result-meta-sub{font-size:10px;color:rgba(255,255,255,0.22);font-weight:700;}
+
+/* ── 2군: 길드 CTA — 사파이어 골드 배너 ── */
+.result-guild-cta{
+  background:linear-gradient(135deg,rgba(10,14,28,0.85),rgba(8,12,22,0.92));
+  border:1px solid rgba(251,191,36,0.22);
+  border-radius:14px;padding:18px 20px;margin-bottom:10px;text-align:center;
+  box-shadow:inset 0 1px 0 rgba(251,191,36,0.15);
+}
+.result-guild-cta-text{
+  font-size:13px;font-weight:700;
+  color:rgba(251,191,36,0.80);
+  letter-spacing:0.2px;line-height:1.5;
+}
+
+/* ── CTA 버튼 ── */
+.result-actions{display:flex;flex-direction:column;gap:8px;padding:8px 18px 24px;flex-shrink:0;}
 .replay-btn{
-  width:100%;padding:14px;border-radius:14px;border:none;
-  background:linear-gradient(135deg,#FBBF24,#F59E0B);color:#000;
-  font-size:14px;font-weight:900;font-family:'Noto Sans KR',sans-serif;cursor:pointer;
-  box-shadow:0 2px 12px rgba(251,191,36,0.25);position:relative;overflow:hidden;
-  transition:transform 0.1s;
+  width:100%;padding:18px;border-radius:14px;border:none;
+  background:linear-gradient(135deg,#FFD700,#F59E0B,#D97706);color:#0a0800;
+  font-size:16px;font-weight:900;font-family:'Noto Sans KR',sans-serif;cursor:pointer;
+  position:relative;overflow:hidden;transition:transform 0.1s;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.32),0 4px 20px rgba(200,140,0,0.38);
+  text-shadow:0 1px 2px rgba(80,40,0,0.35);
+  animation:replayPulse 3.5s ease-in-out infinite;
 }
-.replay-btn:active{transform:scale(0.97);}
+@keyframes replayPulse{
+  0%,100%{opacity:0.92;}
+  50%    {opacity:1;}
+}
+.replay-btn:active{transform:scale(0.97);animation:none;}
 .replay-btn::after{
   content:'';position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);
-  transform:translateX(-100%);animation:sweep 2.5s ease infinite;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.14),transparent);
+  transform:translateX(-100%);animation:sweep 3s ease infinite;
 }
+/* 3군: back-btn — 완전 침묵 */
 .back-btn{
-  width:100%;padding:11px;border-radius:12px;background:transparent;
-  border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);
+  width:100%;padding:10px;border-radius:12px;background:transparent;
+  border:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.36);
   font-size:12px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer;
+  transition:opacity .2s;
 }
+.back-btn:active{opacity:0.6;}
+
+/* 기존 contrib (ov-card 등 공용) */
+.contrib-card{background:rgba(14,18,32,0.55);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:12px 14px;margin-bottom:8px;}
+.contrib-title{font-size:9px;font-weight:700;color:rgba(255,255,255,0.26);letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;}
+.contrib-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:var(--white);margin-bottom:4px;}
+.contrib-improve{font-size:13px;font-weight:900;color:var(--green);}
+.contrib-sub{font-size:10px;color:rgba(255,255,255,0.35);}
 
 /* 파티클 */
 .ptcl{
-  position:absolute;pointer-events:none;font-size:13px;z-index:40;
-  animation:ptclFly .45s cubic-bezier(.2,.8,.3,1) forwards;
+  position:absolute;pointer-events:none;font-size:12px;z-index:40;
+  animation:ptclFly .42s cubic-bezier(.2,.8,.3,1) forwards;
 }
-@keyframes ptclFly{0%{transform:translate(0,0) scale(1);opacity:0.9;}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0;}}
+@keyframes ptclFly{0%{transform:translate(0,0) scale(1);opacity:0.65;}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0;}}
 
 /* ── 보조 오브젝트 오버레이 ── */
 .cell-ov{
-  position:absolute;top:-2px;right:-2px;font-size:11px;z-index:5;
-  background:rgba(0,0,0,0.55);border-radius:50%;padding:2px;
-  filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5));
-  animation:ovPulse 1.8s ease-in-out infinite;line-height:1;
+  position:absolute;top:-2px;right:-2px;font-size:10px;z-index:5;
+  background:rgba(0,0,0,0.5);border-radius:50%;padding:2px;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+  animation:ovPulse 2.2s ease-in-out infinite;line-height:1;
 }
-@keyframes ovPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.25);}}
+@keyframes ovPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
 .cell.has-gold{
-  box-shadow:inset 0 0 0 1.5px rgba(251,191,36,0.6),0 0 6px rgba(251,191,36,0.2)!important;
+  box-shadow:inset 0 0 0 1.2px rgba(251,191,36,0.4)!important;
 }
 .cell.has-clock{
-  box-shadow:inset 0 0 0 1.5px rgba(74,222,128,0.55),0 0 6px rgba(74,222,128,0.15)!important;
+  box-shadow:inset 0 0 0 1.2px rgba(74,222,128,0.38)!important;
 }
 .cell.has-star{
-  box-shadow:inset 0 0 0 1.5px rgba(167,139,250,0.6),0 0 6px rgba(167,139,250,0.2)!important;
+  box-shadow:inset 0 0 0 1.2px rgba(167,139,250,0.4)!important;
 }
-.cell.ov-spawn{animation:ovSpawn .45s ease!important;}
+.cell.ov-spawn{animation:ovSpawn .40s cubic-bezier(0.22,1,0.36,1)!important;}
 @keyframes ovSpawn{
-  0%{transform:scale(.4);filter:brightness(2.5);}
-  65%{transform:scale(1.18);}
-  100%{transform:scale(1);filter:brightness(1);}
+  0%  {transform:scale(.48);opacity:0.6;}
+  55% {transform:scale(1.06);}
+  100%{transform:scale(1);opacity:1;}
+}
+/* ── LastRush 찬스 힌트 ── */
+.cell.lr-hint{animation:lrHint 0.32s cubic-bezier(0.22,1,0.36,1) forwards;}
+@keyframes lrHint{
+  0%  {opacity:1;}
+  30% {opacity:0.62;filter:brightness(1.28);}
+  100%{opacity:1;filter:brightness(1);}
 }
 /* 플로팅 스코어 팝업 */
 .score-pop{
   position:absolute;pointer-events:none;z-index:60;
-  font-family:'Orbitron',monospace;font-size:14px;font-weight:900;
-  text-shadow:0 1px 2px rgba(0,0,0,0.6);
-  animation:scorePop .5s cubic-bezier(.2,.8,.3,1) forwards;
+  font-family:'Orbitron',monospace;font-size:13px;font-weight:900;
+  text-shadow:0 1px 2px rgba(0,0,0,0.5);
+  animation:scorePop .46s cubic-bezier(.2,.8,.3,1) forwards;
 }
 @keyframes scorePop{
-  0%{transform:translateY(0) scale(0.7);opacity:0;}
-  22%{transform:translateY(-6px) scale(1.1);opacity:0.9;}
-  100%{transform:translateY(-32px) scale(0.85);opacity:0;}
+  0%  {transform:translateY(0) scale(0.82);opacity:0;}
+  18% {transform:translateY(-4px) scale(1.02);opacity:0.9;}
+  100%{transform:translateY(-26px) scale(0.88);opacity:0;}
 }
 /* 오브젝트 토스트 */
 .game-toast{
-  position:absolute;top:132px;left:50%;transform:translateX(-50%) translateY(8px);
-  z-index:55;background:rgba(0,0,0,0.85);
-  border:1px solid rgba(255,255,255,0.08);border-radius:10px;
-  padding:7px 16px;font-size:13px;font-weight:700;color:rgba(251,191,36,0.9);
-  white-space:nowrap;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;
+  position:absolute;bottom:68px;left:50%;transform:translateX(-50%) translateY(6px);
+  z-index:55;background:rgba(10,12,22,0.92);
+  border:1px solid rgba(255,255,255,0.1);border-radius:10px;
+  padding:6px 15px;font-size:12px;font-weight:700;color:rgba(251,191,36,0.92);
+  white-space:nowrap;opacity:0;transition:opacity .22s,transform .22s;pointer-events:none;
 }
 .game-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
@@ -510,32 +957,21 @@ html,body{
 }
 .fever-gauge.warn .fever-gauge-fill{
   background:linear-gradient(90deg,#F59E0B,#EF4444);
-  box-shadow:0 0 12px rgba(239,68,68,0.5);
-  animation:gaugePulse .5s ease-in-out infinite;
+  box-shadow:0 0 6px rgba(239,68,68,0.3);
+  animation:gaugePulse 1.8s ease-in-out infinite; /* 0.5s→1.8s: 아케이드→럭셔리 */
 }
-@keyframes gaugePulse{0%,100%{opacity:1;}50%{opacity:.6;}}
+@keyframes gaugePulse{0%,100%{opacity:1;}50%{opacity:.7;}}
 /* ── 피버 진입 플래시 ── */
 .fever-flash{
   position:absolute;inset:0;z-index:30;pointer-events:none;
-  background:radial-gradient(circle at 50% 50%,rgba(251,191,36,0.5),rgba(251,191,36,0.1) 40%,transparent 70%);
+  background:radial-gradient(circle at 50% 50%,rgba(251,191,36,0.35),rgba(251,191,36,0.08) 45%,transparent 70%);
   opacity:0;
 }
-.fever-flash.on{animation:feverFlash .35s cubic-bezier(.2,.8,.3,1) forwards;}
+.fever-flash.on{animation:feverFlash .3s cubic-bezier(.2,.8,.3,1) forwards;}
 @keyframes feverFlash{
-  0%{opacity:0.5;transform:scale(0.9);}
-  30%{opacity:0.35;transform:scale(1.05);}
-  100%{opacity:0;transform:scale(1.2);}
-}
-/* ── 콤보 단계별 스코어 범프 ── */
-.hud-score.bump-high{animation:scoreBumpHigh .2s cubic-bezier(.25,1.4,.55,1);}
-.hud-score.bump-fever{animation:scoreBumpFever .22s cubic-bezier(.25,1.4,.55,1);}
-@keyframes scoreBumpHigh{
-  0%{transform:scale(1.28);color:#EF4444;}
-  100%{transform:scale(1);color:var(--white);}
-}
-@keyframes scoreBumpFever{
-  0%{transform:scale(1.35);color:#FBBF24;}
-  100%{transform:scale(1);color:var(--g);}
+  0%{opacity:0.4;transform:scale(0.95);}
+  40%{opacity:0.22;transform:scale(1.02);}
+  100%{opacity:0;transform:scale(1.1);}
 }
 /* ── 피버 보드 앰비언트 글로우 ── */
 #s-play.fever-mode .board-wrap::after{
@@ -543,69 +979,85 @@ html,body{
   background:radial-gradient(ellipse 70% 45% at 50% 50%,rgba(251,191,36,0.03),transparent 65%);
   animation:feverAmbient 3s ease-in-out infinite;
 }
-@keyframes feverAmbient{0%,100%{opacity:.3;}50%{opacity:.8;}}
+@keyframes feverAmbient{0%,100%{opacity:.25;}50%{opacity:.45;}}
 /* ── 큰 스코어 팝업 (하이콤보/피버) ── */
-.score-pop.big{font-size:18px;animation:scorePopBig .55s cubic-bezier(.2,.8,.3,1) forwards;}
+.score-pop.big{font-size:17px;animation:scorePopBig .5s cubic-bezier(.2,.8,.3,1) forwards;}
+/* ── score-pop.lr : lastRush 구간 숫자 체공 시간 소폭 연장 ──
+   animation-duration만 조정. 크기·색 변경 없음. big.lr은 높은 specificity로 .big 덮음. */
+.score-pop.lr      { animation-duration:0.62s; }
+.score-pop.big.lr  { animation-duration:0.68s; }
+/* ── score-pop.nf : near-fever 구간 — 아주 미세하게 빠른 등장 (40ms) ──
+   콤보 리듬이 조금 더 또렷하게 느껴지는 효과. 인식 불가 수준. */
+.score-pop.nf      { animation-duration:0.42s; }
+.score-pop.big.nf  { animation-duration:0.47s; }
 @keyframes scorePopBig{
-  0%{transform:translateY(0) scale(0.7);opacity:0;}
-  20%{transform:translateY(-8px) scale(1.15);opacity:0.9;}
-  100%{transform:translateY(-38px) scale(0.9);opacity:0;}
+  0%  {transform:translateY(0) scale(0.78);opacity:0;}
+  20% {transform:translateY(-5px) scale(1.05);opacity:0.9;}
+  100%{transform:translateY(-32px) scale(0.88);opacity:0;}
 }
 
 /* ── 랜덤 이벤트 ── */
-.event-banner{
-  position:absolute;top:88px;left:0;right:0;z-index:25;
-  text-align:center;pointer-events:none;
-  opacity:0;transform:scale(.7) translateY(-10px);
-  transition:all .35s cubic-bezier(.34,1.56,.64,1);
+/* ── Near-Miss 반응 ──────────────────────────────
+   셀에 직접 pulse 하지 않음 (위치 정보 제거).
+   대신 board 전체에 극도로 낮은 opacity flash 1회.
+   "아깝다" 감정 완충만. 힌트 아님.
+────────────────────────────────────────────────── */
+@keyframes nmBoardFlash{
+  0%  {opacity:1;}
+  30% {opacity:0.82;}   /* 0.88→0.82: 미세하게 더 체감 */
+  100%{opacity:1;}
 }
-.event-banner.on{opacity:1;transform:scale(1) translateY(0);}
-.event-title{
-  font-family:'Orbitron',monospace;font-size:14px;font-weight:900;
-  letter-spacing:1px;padding:8px 22px;border-radius:12px;display:inline-block;
+.board-wrap.nm-flash{
+  animation:nmBoardFlash 0.26s ease-out forwards;  /* 0.28s→0.26s: 더 짧게 */
 }
-.event-banner.golden .event-title{
-  background:linear-gradient(135deg,rgba(251,191,36,0.92),rgba(245,158,11,0.92));
-  color:#000;box-shadow:0 2px 16px rgba(251,191,36,0.3);
-}
-.event-banner.rush .event-title{
-  background:linear-gradient(135deg,rgba(139,92,246,0.92),rgba(109,40,217,0.92));
-  color:#fff;box-shadow:0 2px 16px rgba(139,92,246,0.3);
-}
-@keyframes eventPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.04);}}
-.event-sub{font-size:11px;font-weight:700;margin-top:4px;color:var(--g);}
-#s-play.golden-mode{background:linear-gradient(160deg,#1a1400,#0d0a00)!important;}
-#s-play.rush-mode{background:linear-gradient(160deg,#120822,#08041a)!important;}
-.cell.rush-target{animation:rushGlow .8s ease-in-out infinite!important;}
-@keyframes rushGlow{
-  0%,100%{transform:scale(1);}
-  50%{transform:scale(1.04);}
+
+/* ── Anticipation (피버 직전 긴장감 레이어) ─────────
+   combo===4 (게이지 80%) 시 진입. 피버 진입 또는 콤보 끊김 시 즉시 해제.
+   [B] fever-gauge.near-fever: contrast(1.04) — 4px 게이지가 살짝 더 선명.
+       .warn 상태에서 추가되므로 사실상 불감지 수준.
+   [C] score-pop.nf: animation-duration 40ms 단축 — 콤보 리듬 미세 강화.
+   ※ board-wrap 전체 filter 제거: 7×7 컬러 보드에 contrast 적용 시
+      "보드가 밝아졌다"는 인식이 발생 → 실패 조건. 제거가 맞음.
+────────────────────────────────────────────────── */
+.fever-gauge.near-fever{
+  filter:contrast(1.04);
+  transition:filter 0.45s ease;
 }
 
 /* ── 연장 팝업 보상 미리보기 ── */
 .popup-reward{
   background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
-  border-radius:14px;padding:12px 16px;margin-bottom:16px;
+  border-radius:14px;padding:14px 16px;margin-bottom:16px;
 }
-.popup-reward-row{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);padding:3px 0;}
-.popup-reward-val{color:var(--g);font-weight:900;font-family:'Orbitron',monospace;font-size:12px;}
-.popup-reward-val.green{color:var(--green);}
+/* 현재 점수 라벨 */
+.popup-reward-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;}
+.popup-reward-lbl{font-size:11px;font-weight:700;color:rgba(255,255,255,0.38);letter-spacing:0.3px;}
+/* 현재 점수 값 — 크고 흰색 */
+.popup-reward-val{
+  color:var(--white);font-weight:900;
+  font-family:'Orbitron',monospace;font-size:18px;
+  letter-spacing:-0.5px;
+}
+/* 연장 예상 값 — amber 강조 */
+.popup-reward-val.est{
+  color:var(--g);font-size:22px;
+  text-shadow:0 0 12px rgba(251,191,36,0.25);
+}
+.popup-reward-divider{
+  height:1px;background:rgba(255,255,255,0.05);margin:6px 0;
+}
 /* ── 하이라이트 카드 ── */
 .hl-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:var(--white);padding:3px 0;}
 .hl-val{font-weight:900;color:var(--white);font-family:'Orbitron',monospace;font-size:14px;}
 .hl-val.gold{color:var(--g);}
 .hl-val.green{color:var(--green);}
 .hl-val.purple{color:var(--purple);}
-/* ── 농장 보상 카드 ── */
-.farm-row{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--white);padding:3px 0;}
-.farm-ico{font-size:16px;flex-shrink:0;}
-.farm-val{margin-left:auto;font-weight:900;color:var(--green);font-family:'Orbitron',monospace;font-size:14px;}
 
 /* ── 온보딩 힌트 (첫 판만) ── */
 .onboard{
   position:absolute;inset:0;z-index:80;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:rgba(0,0,0,0.6);backdrop-filter:blur(2px);
+  background:rgba(0,0,0,0.62);
   opacity:0;pointer-events:none;transition:opacity .3s;
 }
 .onboard.on{opacity:1;pointer-events:all;}
@@ -633,47 +1085,52 @@ html,body{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   opacity:0;pointer-events:none;
   transition:opacity .2s;
+  /* 보드 위 전체 반투명 배경 — 숫자 가시성 확보 */
+  background:rgba(0,0,0,0.55);
 }
 .countdown.on{opacity:1;pointer-events:all;}
-/* 반투명 배경 링 */
+/* 숫자 뒤 원형 배경 */
 .cd-ring{
-  position:relative;width:140px;height:140px;
+  position:relative;width:160px;height:160px;
   display:flex;align-items:center;justify-content:center;
+  /* 진한 원형 배경 */
+  background:radial-gradient(circle,rgba(10,10,20,0.88) 55%,rgba(10,10,20,0.6) 75%,transparent 100%);
+  border-radius:50%;
 }
 .cd-ring::before{
   content:'';position:absolute;inset:0;
   border-radius:50%;
-  border:3px solid rgba(251,191,36,0.15);
-  box-shadow:0 0 40px rgba(251,191,36,0.08),inset 0 0 30px rgba(251,191,36,0.04);
+  border:2px solid rgba(251,191,36,0.25);
+  box-shadow:0 0 32px rgba(251,191,36,0.12),inset 0 0 24px rgba(251,191,36,0.06);
 }
 .cd-ring::after{
   content:'';position:absolute;inset:-4px;
   border-radius:50%;
   border:2px solid transparent;
-  border-top-color:rgba(251,191,36,0.7);
+  border-top-color:rgba(251,191,36,0.8);
   animation:cdSpin 1.2s linear infinite;
 }
 @keyframes cdSpin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
 /* 숫자 */
 .cd-num{
-  font-family:'Orbitron',monospace;font-size:72px;font-weight:900;
+  font-family:'Orbitron',monospace;font-size:76px;font-weight:900;
   background:linear-gradient(180deg,#FBBF24 0%,#F59E0B 50%,#D97706 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 0 20px rgba(251,191,36,0.5)) drop-shadow(0 4px 8px rgba(0,0,0,0.4));
+  filter:drop-shadow(0 0 16px rgba(251,191,36,0.6)) drop-shadow(0 3px 6px rgba(0,0,0,0.8));
   position:relative;z-index:2;
 }
 .cd-num.pop{animation:cdNumPop .7s cubic-bezier(.175,.885,.32,1.275) forwards;}
 @keyframes cdNumPop{
-  0%{transform:scale(0) rotate(-15deg);opacity:0;filter:drop-shadow(0 0 0 transparent) blur(8px);}
-  35%{transform:scale(1.15) rotate(3deg);opacity:1;filter:drop-shadow(0 0 30px rgba(251,191,36,0.7)) blur(0);}
-  55%{transform:scale(.95) rotate(-1deg);}
-  70%{transform:scale(1.03) rotate(0);}
-  100%{transform:scale(1) rotate(0);opacity:1;filter:drop-shadow(0 0 20px rgba(251,191,36,0.5)) blur(0);}
+  0%  {transform:scale(0)    rotate(-15deg);opacity:0;}
+  35% {transform:scale(1.15) rotate(3deg);  opacity:1;}
+  55% {transform:scale(.95)  rotate(-1deg);}
+  70% {transform:scale(1.03) rotate(0);}
+  100%{transform:scale(1)    rotate(0);     opacity:1;}
 }
 .cd-num.out{animation:cdNumOut .25s ease forwards;}
 @keyframes cdNumOut{
-  0%{transform:scale(1);opacity:1;}
-  100%{transform:scale(1.8);opacity:0;filter:blur(6px);}
+  0%  {transform:scale(1);  opacity:1;}
+  100%{transform:scale(1.8);opacity:0;}
 }
 /* 하단 라벨 */
 .cd-label{
@@ -728,12 +1185,17 @@ html,body{
   box-shadow:0 2px 12px rgba(139,92,246,0.25);
 }
 .ext-skip{
-  background:none;border:none;color:rgba(255,255,255,0.3);
-  font-size:12px;font-weight:700;font-family:'Noto Sans KR',sans-serif;
-  cursor:pointer;padding:10px;letter-spacing:0.5px;
-  transition:color 0.2s;
+  display:block;width:100%;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:12px;
+  color:rgba(255,255,255,0.55);
+  font-size:13px;font-weight:700;font-family:'Noto Sans KR',sans-serif;
+  cursor:pointer;padding:11px 20px;
+  letter-spacing:0.3px;
+  transition:background .2s,color .2s;
 }
-.ext-skip:active{color:rgba(255,255,255,0.5);}
+.ext-skip:active{background:rgba(255,255,255,0.09);color:rgba(255,255,255,0.75);}
 .popup-btn-used{
   opacity:.35;pointer-events:none;
   background:rgba(255,255,255,0.06)!important;color:var(--muted)!important;
@@ -745,10 +1207,10 @@ html,body{
 .gameover-overlay{
   position:absolute;inset:0;z-index:95;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:rgba(0,0,0,0);pointer-events:none;opacity:0;
-  transition:background .5s ease,opacity .3s ease;
+  background:rgba(0,0,0,0.75);pointer-events:none;opacity:0;
+  transition:opacity .3s ease;
 }
-.gameover-overlay.on{opacity:1;pointer-events:all;background:rgba(0,0,0,0.75);}
+.gameover-overlay.on{opacity:1;pointer-events:all;}
 .gameover-text{
   font-family:'Orbitron',monospace;font-size:28px;font-weight:900;
   background:linear-gradient(135deg,#FBBF24,#F59E0B);
@@ -760,10 +1222,10 @@ html,body{
   animation:goTextIn .6s cubic-bezier(.175,.885,.32,1.275) .15s forwards;
 }
 @keyframes goTextIn{
-  0%{transform:scale(0) rotate(-8deg);opacity:0;filter:blur(8px);}
-  50%{transform:scale(1.1) rotate(2deg);opacity:1;filter:blur(0);}
-  70%{transform:scale(.95) rotate(0);}
-  100%{transform:scale(1) rotate(0);opacity:1;}
+  0%  {transform:scale(0)    rotate(-8deg);opacity:0;}
+  50% {transform:scale(1.1)  rotate(2deg); opacity:1;}
+  70% {transform:scale(.95)  rotate(0);}
+  100%{transform:scale(1)    rotate(0);    opacity:1;}
 }
 .gameover-line{
   width:120px;height:2px;margin-top:12px;
@@ -779,15 +1241,18 @@ html,body{
 @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-7px);}}
 @keyframes sweep{0%{transform:translateX(-100%);}60%,100%{transform:translateX(100%);}}
 @keyframes goldShimmer{0%{background-position:200% center;}100%{background-position:-200% center;}}
-@keyframes scoreBump{0%{transform:scale(1.22);color:var(--g);}100%{transform:scale(1);color:var(--white);}}
 @keyframes tick{0%,100%{transform:scale(1);}50%{transform:scale(.92);}}
-@keyframes popIn{0%{transform:scale(0.85) translateY(12px);opacity:0;}60%{transform:scale(1.02) translateY(-2px);opacity:1;}100%{transform:scale(1) translateY(0);opacity:1;}}
+@keyframes popIn{
+  0%  {transform:scale(0.88) translateY(10px);opacity:0;}
+  60% {transform:scale(1.015) translateY(-1px);opacity:1;}
+  100%{transform:scale(1) translateY(0);opacity:1;}
+}
 @keyframes stampIn{0%{transform:scale(0) rotate(-15deg);opacity:0;}70%{transform:scale(1.08) rotate(3deg);}100%{transform:scale(1) rotate(0);opacity:1;}}
 @keyframes countReveal{
-  0%{transform:scale(.5);opacity:0;filter:blur(4px);}
-  60%{transform:scale(1.08);opacity:1;filter:blur(0);}
-  80%{transform:scale(.97);}
-  100%{transform:scale(1);opacity:1;filter:blur(0);}
+  0%  {transform:scale(.5);  opacity:0;}
+  60% {transform:scale(1.08);opacity:1;}
+  80% {transform:scale(.97);}
+  100%{transform:scale(1);   opacity:1;}
 }
 @keyframes shakeX{0%,100%{transform:translateX(0);}25%{transform:translateX(-7px);}75%{transform:translateX(7px);}}
 </style>
@@ -799,44 +1264,49 @@ html,body{
 <div class="screen active" id="s-lobby">
   <div class="lobby-bg"></div>
   <div class="lobby-inner">
-    <div class="lobby-header">
-      <div class="lobby-title">POTATO PANG</div>
-      <div class="lobby-plays">🎮 <span id="lby-plays">7</span>/10판</div>
-    </div>
-    <div class="tier-card">
-      <span class="tier-emoji">🥈</span>
-      <div class="tier-name">현재 길드: 실버 티어</div>
-      <div class="tier-goal">🔥 최고 점수를 갱신해 보세요!</div>
-      <div class="tier-sub">이번 판 점수가 길드 랭킹에 즉시 반영됩니다</div>
-    </div>
-    <div class="ad-card pulse" id="ad-card">
-      <div class="ad-row">
-        <div class="ad-icon">🎁</div>
-        <div class="ad-text">
-          <div class="ad-title">광고 보고 이번 판 점수 2배!</div>
-          <div class="ad-sub">남은 부스터: 5/5회</div>
+    <!-- 스크롤 가능한 콘텐츠 영역 -->
+    <div class="lobby-scroll">
+      <div class="lobby-header">
+        <div class="lobby-title">POTATO PANG</div>
+      </div>
+      <div class="tier-card">
+        <span class="tier-emoji">🥈</span>
+        <div class="tier-name">현재 길드: 실버 티어</div>
+        <div class="tier-goal">🔥 최고 점수를 갱신해 보세요!</div>
+        <div class="tier-sub">이번 판 점수가 길드 랭킹에 즉시 반영됩니다</div>
+      </div>
+      <div class="ad-card pulse" id="ad-card">
+        <div class="ad-row">
+          <div class="ad-icon">🎁</div>
+          <div class="ad-text">
+            <div class="ad-title">광고 보고 이번 판 점수 2배!</div>
+            <div class="ad-sub">남은 부스터: 5/5회</div>
+          </div>
+          <div class="tgl on" id="ad-tgl" onclick="toggleAd()"><div class="tgl-k"></div></div>
         </div>
-        <div class="tgl on" id="ad-tgl" onclick="toggleAd()"><div class="tgl-k"></div></div>
+        <div class="ad-hint" id="ad-hint">⚡ ON 상태 · 게임 시작 시 광고 → 이번 판 점수 ×2 적용</div>
       </div>
-      <div class="ad-hint" id="ad-hint">⚡ ON 상태 · 게임 시작 시 광고 → 이번 판 점수 ×2 적용</div>
+      <!-- 게임 가이드 -->
+      <div class="guide-card">
+        <div class="guide-title">게임 가이드</div>
+        <div class="guide-section">
+          <div class="guide-row"><span class="guide-dot">👆</span><span>감자 두 개를 탭해서 자리를 바꿔요</span></div>
+          <div class="guide-row"><span class="guide-dot">💥</span><span>같은 감자 3개가 이어지면 팡!</span></div>
+          <div class="guide-row"><span class="guide-dot">⏱</span><span>60초 안에 최고 점수 도전</span></div>
+        </div>
+        <div class="guide-divider"></div>
+        <div class="guide-section">
+          <div class="guide-label">꿀팁</div>
+          <div class="guide-row"><span class="guide-dot tip">💡</span><span>연속 매치 5회 → <b style="color:var(--g)">피버 타임!</b></span></div>
+          <div class="guide-row"><span class="guide-dot tip">💡</span><span>4개 연결 → <b style="color:#f97316">십자 폭발</b></span></div>
+          <div class="guide-row"><span class="guide-dot tip">💡</span><span>💰⏰⭐ 특수 감자를 노려보세요</span></div>
+        </div>
+      </div>
     </div>
-    <!-- 게임 가이드 -->
-    <div class="guide-card">
-      <div class="guide-title">📖 게임 가이드</div>
-      <div class="guide-section">
-        <div class="guide-row"><span class="guide-dot">🎯</span><span>인접한 감자를 터치해서 위치 교환</span></div>
-        <div class="guide-row"><span class="guide-dot">💥</span><span>같은 종류 3개가 연결되면 팡!</span></div>
-        <div class="guide-row"><span class="guide-dot">⏱</span><span>60초 안에 최고 점수 도전</span></div>
-      </div>
-      <div class="guide-divider"></div>
-      <div class="guide-section">
-        <div class="guide-label">꿀팁</div>
-        <div class="guide-row"><span class="guide-dot tip">💡</span><span>연속 매치 5회 → <b style="color:var(--g)">피버 타임!</b></span></div>
-        <div class="guide-row"><span class="guide-dot tip">💡</span><span>4개 연결 → <b style="color:#f97316">십자 폭발</b></span></div>
-        <div class="guide-row"><span class="guide-dot tip">💡</span><span>💰⏰⭐ 특수 감자를 노려보세요</span></div>
-      </div>
+    <!-- 버튼 고정 영역 — 스크롤과 분리 -->
+    <div class="lobby-footer">
+      <button class="start-btn" onclick="startGame()">➔ 퍼즐 시작하기</button>
     </div>
-    <button class="start-btn" onclick="startGame()">➔ 퍼즐 시작하기</button>
   </div>
 </div>
 
@@ -849,29 +1319,37 @@ html,body{
     <div class="gameover-text">GAME OVER</div>
     <div class="gameover-line"></div>
   </div>
-  <!-- 좌우 보조 정보 -->
-  <div class="hud-sides">
-    <div class="hud-side"><div class="hud-side-lbl">판수</div><div class="hud-side-val" id="h-plays">7</div></div>
-    <div class="hud-side"><div class="hud-side-lbl">콤보</div><div class="hud-side-val" id="h-combo" style="color:var(--purple)">—</div></div>
-  </div>
-  <!-- 메인 HUD: SCORE 중앙, TIME 아래 -->
-  <div class="hud">
-    <div class="hud-score-lbl">SCORE</div>
-    <div class="hud-score" id="h-score">0</div>
-    <div class="hud-time-row">
-      <div class="hud-time-lbl">TIME</div>
-      <div class="hud-time" id="h-time">60</div>
+  <!-- HUD 전체: 판수/콤보 → 스코어 → 타임바+시간 -->
+  <div class="hud-wrap">
+    <div class="hud-topbar">
+      <div class="hud-chip">
+        <span class="hud-chip-lbl">판수</span>
+        <span class="hud-chip-val" id="h-plays">7</span>
+      </div>
+      <div class="hud-chip">
+        <span class="hud-chip-lbl">콤보</span>
+        <span class="hud-chip-val" id="h-combo" style="color:var(--purple)">—</span>
+      </div>
     </div>
+    <div class="hud-score-block">
+      <div class="hud-score-lbl">SCORE</div>
+      <div class="hud-score" id="h-score">0</div>
+    </div>
+    <div class="hud-time-block">
+      <div class="hud-time-row">
+        <span class="hud-time-lbl">TIME</span>
+        <div class="hud-timebar-wrap"><div class="hud-timebar-fill" id="h-timebar-fill"></div></div>
+        <span class="hud-time" id="h-time">60</span>
+        <span class="hud-time-unit">s</span>
+      </div>
+    </div>
+    <!-- 이벤트 배너 제거됨 -->
   </div>
   <div class="combo-strip" id="combo-strip"></div>
   <div class="fever-gauge" id="fever-gauge"><div class="fever-gauge-fill" id="fever-gauge-fill"></div></div>
   <div class="fever-banner" id="fever-banner">
     <div class="fever-text">🔥 FEVER TIME! 🔥</div>
     <div class="fever-sub">모든 점수 1.5배 · <span id="fever-t">10</span>초</div>
-  </div>
-  <div class="event-banner" id="event-banner">
-    <div class="event-title" id="event-title"></div>
-    <div class="event-sub" id="event-sub"></div>
   </div>
   <div class="onboard" id="onboard">
     <div class="onboard-text">같은 감자를 맞바꿔<br>3개를 맞추면 팡! 💥</div>
@@ -882,7 +1360,20 @@ html,body{
     <div class="board" id="board"></div>
   </div>
   <div class="play-bottom">
-    <button class="quit-btn" onclick="forceEnd()">게임 포기</button>
+    <button class="quit-btn" onclick="showQuitConfirm()">게임 포기</button>
+    <button class="mute-btn" id="mute-btn" onclick="toggleMute()">🔊</button>
+  </div>
+  <!-- 포기 확인 오버레이 — 보드 블러로 블록 위치 숨김 -->
+  <div class="quit-overlay" id="quit-overlay">
+    <div class="quit-popup">
+      <span class="quit-popup-ico">🥔</span>
+      <div class="quit-popup-title">정말 포기하시겠어요?</div>
+      <div class="quit-popup-sub">지금까지의 점수로<br>결과창으로 이동합니다</div>
+      <div class="quit-popup-btns">
+        <button class="quit-confirm-btn" onclick="confirmQuit()">포기하기</button>
+        <button class="quit-cancel-btn" onclick="cancelQuit()">계속하기</button>
+      </div>
+    </div>
   </div>
   <!-- 카운트다운 오버레이 (3-2-1 프리미엄) -->
   <div class="countdown" id="countdown">
@@ -919,37 +1410,45 @@ html,body{
 <!-- ══════ 결과 ══════ -->
 <div class="screen" id="s-result">
   <div class="result-inner">
-    <div class="result-title">🎉 게임 결과</div>
-    <div class="result-score-card">
-      <div class="res-base" id="r-base">0점 (기본)</div>
-      <div class="res-buff" id="r-buff">🎁 광고 2배 버프 발동!</div>
-      <div class="res-final" id="r-final">0</div>
-      <div class="res-unit">점</div>
-    </div>
-    <div class="contrib-card" id="hl-card">
-      <div class="contrib-title">⚡ 이번 판 하이라이트</div>
-      <div id="hl-stats"></div>
-    </div>
-    <div class="contrib-card">
-      <div class="contrib-title">🛡️ 길드 기여도 반영</div>
-      <div class="contrib-row">
-        <span>기여 점수</span>
-        <span class="contrib-improve" id="r-guild-pts" style="color:var(--g)">—</span>
+    <!-- 스크롤 영역 -->
+    <div class="result-scroll">
+      <div class="result-title">RESULT</div>
+      <div class="result-score-card" id="result-score-card">
+        <div class="res-base" id="r-base">0점 (기본)</div>
+        <div class="res-buff" id="r-buff">광고 2배 버프 적용</div>
+        <div class="res-final-wrap">
+          <div class="res-final" id="r-final">0</div>
+          <div class="res-unit" id="r-unit">점</div>
+        </div>
+        <div class="res-unverified-label" id="r-unverified-label" style="display:none">⚠ 미검증 점수 — 서버 확인 전</div>
       </div>
-      <div style="text-align:right;font-size:11px;color:var(--muted);margin:-2px 0 6px" id="r-guild-tier"></div>
+      <!-- 하이라이트: buildHighlights()로 2~3개만 선택 -->
+      <div class="result-hl-card" id="hl-card">
+        <div class="result-hl-title">THIS ROUND</div>
+        <div id="hl-stats"></div>
+        <div class="hl-trigger" id="hl-trigger"></div>
+      </div>
+      <!-- 길드 기여 + 농장 단축 통합 메타카드 -->
+      <div class="result-meta-card">
+        <div class="result-meta-item">
+          <div class="result-meta-lbl">길드 기여</div>
+          <div class="result-meta-val" id="r-guild-pts">—</div>
+          <div class="result-meta-sub" id="r-guild-tier"></div>
+        </div>
+        <div class="result-meta-item">
+          <div class="result-meta-lbl">수확 단축</div>
+          <div class="result-meta-val green">-30분</div>
+          <div class="result-meta-sub" id="r-plays-sub">오늘 남은 <span id="r-plays">6</span>회</div>
+        </div>
+      </div>
+      <!-- 길드 기여 CTA -->
+      <div class="result-guild-cta">
+        <div class="result-guild-cta-text">🏆 길드 랭킹에 큰 기여를 하셨습니다!</div>
+      </div>
     </div>
-    <div class="contrib-card" id="farm-card" style="border-color:rgba(74,222,128,0.25)">
-      <div class="contrib-title">🌾 농장 시간 단축 보상</div>
-      <div id="farm-stats"></div>
-    </div>
-    <div class="contrib-card" id="ov-card" style="display:none">
-      <div class="contrib-title">🎯 보너스 오브젝트</div>
-      <div id="ov-stats" style="font-size:12px;line-height:1.9;color:var(--white);font-weight:700;"></div>
-    </div>
+    <!-- 버튼 고정 영역 -->
     <div class="result-actions">
-      <button class="replay-btn" onclick="goLobby()">
-        🔄 한 판 더 하기 (남은 플레이: <span id="r-plays">6</span>/10)
-      </button>
+      <button class="replay-btn" onclick="playsLeft>0?startGame():goLobby()">한 판 더</button>
       <button class="back-btn" onclick="goLobby()">로비로 나가기</button>
     </div>
   </div>
@@ -968,8 +1467,79 @@ const BOMB_BONUS=25, RAINBOW_BONUS=50;
 const FEVER_MULT=1.5, AD_MULT=2;
 const GRID_GAP=4; // CSS gap (px)
 const GOLD_BONUS=100, CLOCK_BONUS=3, STAR_COMBO=2;
-const GOLDEN_MULT=1.5, GOLDEN_DUR=5, RUSH_MULT=2, RUSH_DUR=4;
-const COLOR_NAMES=['🔴 빨강','🧊 시안','🟢 초록','⚡ 노랑','💗 핑크'];
+
+/* ── Last Rush 전용 상수 ──────────────────────────
+   수치 조정은 여기서만. 코드 내부 하드코딩 금지.
+   LR_DEBUG: 프로덕션에서 false로 변경
+────────────────────────────────────────────────── */
+const LR_TRIGGER_SEC    = 10;    // lastRush 진입 시점 (초, 고정)
+const BASE_COMBO_WINDOW = 850;   // 기본 콤보 유지 시간 (ms)
+const LR_COMBO_BONUS    = 200;   // lastRush 콤보창 추가 (ms) — 300 이상 금지
+const LR_OV_DELAY_MIN   = 1500;  // 추가 오브젝트 스폰 최소 딜레이 (ms)
+const LR_OV_DELAY_RNG   = 2000;  // 추가 오브젝트 스폰 랜덤 범위 (ms)
+const LR_DEBUG          = false; // QA 로그 플래그 — 배포 전 false로 변경
+
+/* ── Near-Miss 전용 상수 ─────────────────────────
+   수치 조정은 여기서만. 코드 내부 하드코딩 금지.
+   NM_DEBUG: 프로덕션에서 false로 변경
+────────────────────────────────────────────────── */
+const NM_COOLDOWN_MS = 5000;  // 쿨다운 (ms) — 게임 전체 기댓값 2~3회 수준 유지
+const NM_FIRE_PROB   = 0.38;  // 판정 통과 후 실제 발동 확률 — 남발 방지
+const NM_DURATION_MS = 380;   // 연출 지속 시간 (ms)
+const NM_DEBUG       = false; // QA 로그 플래그 — 배포 전 false로 변경
+
+/* ── Anticipation(피버 직전 긴장감) 전용 상수 ──────
+   콤보 게이지 80%(combo=4)에서 진입.
+   시각 변화는 사용자가 인식 못하는 수준으로 제한.
+   ANTCP_DEBUG: 프로덕션에서 false로 변경
+────────────────────────────────────────────────── */
+const ANTCP_COMBO = 4;     // anticipation 진입 기준 콤보 (= 게이지 80%)
+const ANTCP_COMBO_WINDOW = 80; // anticipation 콤보창 추가 (ms) — LR_COMBO_BONUS보다 작게 유지
+const ANTCP_DEBUG = false; // QA 로그 플래그 — 배포 전 false로 변경
+
+/* ── Feel 튜닝 상수 ──────────────────────────────
+   손맛 조정은 여기서만. 코드 내부 하드코딩 금지.
+   ┌──────────────────┬────────┬─────────────────┐
+   │ 항목              │ 구버전  │ 신버전           │
+   ├──────────────────┼────────┼─────────────────┤
+   │ 성공 스왑 CSS     │ 0.12s  │ 0.10s           │
+   │ 성공 스왑 sleep   │ 125ms  │ 105ms           │
+   │ 실패 push CSS     │ 0.08s  │ 0.07s           │
+   │ 실패 push sleep   │ 85ms   │ 72ms            │
+   │ 실패 return CSS   │ 0.10s  │ 0.09s           │
+   │ 실패 return sleep │ 105ms  │ 92ms            │
+   │ 실패 push 비율    │ 0.25   │ 0.22            │
+   │ 폭발 대기         │ 210ms  │ 185ms           │
+   │ 낙하 base dur     │ 160ms  │ 140ms           │
+   │ 낙하 dist/칸      │ 25ms   │ 22ms            │
+   │ 낙하 wait base    │ 170ms  │ 150ms           │
+   │ 낙하 wait/칸      │ 28ms   │ 24ms            │
+   └──────────────────┴────────┴─────────────────┘
+   FEEL_DEBUG: 프로덕션에서 false로 변경
+────────────────────────────────────────────────── */
+const FEEL_DEBUG = false;
+
+// 스왑 타이밍
+const SWAP_OK_DUR    = '0.10s'; // 성공 스왑 CSS transition duration
+const SWAP_OK_WAIT   = 105;     // 성공 스왑 sleep (ms)
+const SWAP_FAIL_PUSH_DUR    = '0.07s'; // 실패 push CSS duration
+const SWAP_FAIL_PUSH_WAIT   = 72;      // 실패 push sleep (ms)
+const SWAP_FAIL_RETURN_DUR  = '0.09s'; // 실패 return CSS duration
+const SWAP_FAIL_RETURN_WAIT = 92;      // 실패 return sleep (ms)
+const SWAP_FAIL_PUSH_RATIO  = 0.22;    // push 이동 비율 (셀간 거리의 N%)
+
+// 매치/낙하 타이밍
+const EXPLODE_WAIT    = 185; // 폭발 대기 (ms) — CSS .18s + 5ms 버퍼
+const FALL_BASE_DUR   = 140; // 낙하 base duration (ms)
+const FALL_DIST_DUR   = 22;  // 낙하 dist당 추가 duration (ms)
+const FALL_WAIT_BASE  = 150; // 낙하 완료 대기 base (ms)
+const FALL_WAIT_DIST  = 24;  // 낙하 완료 대기 dist당 (ms)
+
+// 스와이프 감지
+const SWIPE_THRESHOLD_PX = 16;  // 스와이프 인정 최소 거리 (px)
+                                 // 14px→16px: 빠른 탭의 2-3px 밀림으로 오발화 방지
+                                 // 16px = 셀 폭(~50px)의 32%
+// SWIPE_AXIS_RATIO 제거 — 축비율 체크 제거, 항상 우세축 발동으로 변경
 
 /* ════════════════════════════════════════════════
    감자 캐릭터 SVG — 매력형 최종 버전
@@ -978,190 +1548,336 @@ const COLOR_NAMES=['🔴 빨강','🧊 시안','🟢 초록','⚡ 노랑','💗 
 
 const SVG_DATA = [
 
-/* 🔥 p0 불 감자 — 위쪽 뾰족 실루엣, 비대칭 자신감 */
+/* 🔥 p0 빨강 — 비비드 크림슨 화염 */
 `<svg viewBox="0 0 40 40">
-<path d="M20 3 C26 3 33 8 34 17 C35 26 29 35 20 35 C11 35 5 26 6 17 C7 8 14 3 20 3Z"
-  fill="#c98c4f" stroke="#5a3318" stroke-width="1.4"/>
-<ellipse cx="14" cy="10" rx="5" ry="2.5" fill="rgba(255,255,255,0.12)" transform="rotate(-15 14 10)"/>
-<circle cx="10" cy="16" r=".8" fill="#8a5a34" opacity=".5"/>
-<circle cx="29" cy="14" r=".9" fill="#8a5a34" opacity=".4"/>
-<circle cx="28" cy="27" r=".7" fill="#8a5a34" opacity=".4"/>
-<path d="M20 0.5 C17 6 14 7 16 11 C18 10 20 9 22 11 C24 9 25 7 24 4 C26 6 27 9 26 12 C24 15 22 16 20 16 C17 16 15 14 14 11.5 C13 8 15 4 20 0.5Z"
-  fill="#ff6a00"/>
-<path d="M20 3 C19 6 20 7 20 9 C21 7 21 5.5 20.5 3.5Z" fill="#ffe066"/>
-<path d="M10.5 16.5 L16 14.5" stroke="#3a1d10" stroke-width="2.2" stroke-linecap="round"/>
-<path d="M24 14.5 L29.5 16.5" stroke="#3a1d10" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M20 3C26 3 33 8 34 17C35 26 29 35 20 35C11 35 5 26 6 17C7 8 14 3 20 3Z" fill="#9e5828" stroke="#2d1205" stroke-width="1.4"/>
+<path d="M20 33C13 33 6 27 6 20C12 23 28 23 34 20C33 27 27 33 20 33Z" fill="rgba(0,0,0,0.35)"/>
+<path d="M20 3C26 3 33 8 34 17C28 14 12 14 6 17C7 8 14 3 20 3Z" fill="rgba(255,160,80,0.22)"/>
+<ellipse cx="13.5" cy="9.5" rx="6" ry="3" fill="rgba(255,255,255,0.26)" transform="rotate(-15 13.5 9.5)"/>
+<path d="M20 0C16.5 5.5 13 7 15.5 11.5C17.5 10.5 20 9.5 22.5 11.5C25 9.5 26 7 24.5 3.5C27 6 28 10 26.5 13C24.5 16 22 17 20 17C18 17 15.5 16 13.5 13C12 10 14 5.5 20 0Z" fill="#ff3000"/>
+<path d="M20 2.5C19 6 20 8 20 10C21 8 21.5 6 21 3Z" fill="#ffcc00"/>
+<path d="M10.5 16.5L16 14.5" stroke="#1e0802" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M24 14.5L29.5 16.5" stroke="#1e0802" stroke-width="2.2" stroke-linecap="round"/>
 <ellipse cx="13.5" cy="20" rx="3.2" ry="3.4" fill="white"/>
 <ellipse cx="26.5" cy="20" rx="3.2" ry="3.4" fill="white"/>
-<circle cx="14" cy="20.5" r="1.7" fill="#1a0a05"/>
-<circle cx="26" cy="20.5" r="1.7" fill="#1a0a05"/>
+<circle cx="14" cy="20.5" r="1.8" fill="#1a0a05"/>
+<circle cx="26" cy="20.5" r="1.8" fill="#1a0a05"/>
 <circle cx="13" cy="19.2" r=".6" fill="white"/>
 <circle cx="25" cy="19.2" r=".6" fill="white"/>
-<path d="M14 28 Q22 33 28 26" stroke="#3a1d10" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-<ellipse cx="9.5" cy="23" rx="2.2" ry="1.2" fill="rgba(255,80,60,0.15)"/>
-<ellipse cx="30.5" cy="23" rx="2.2" ry="1.2" fill="rgba(255,80,60,0.15)"/>
+<path d="M14 28Q22 33 28 26" stroke="#1e0802" stroke-width="2.4" fill="none" stroke-linecap="round"/>
 </svg>`,
 
-/* ❄️ p1 얼음 감자 — 얼굴 중심 하향 */
+/* ❄️ p1 시안 — 일렉트릭 시안 크리스탈 */
 `<svg viewBox="0 0 40 40">
-<path d="M20 5
-         C28.4 5 34 10.6 34 18.8
-         C34 28.3 27.6 35 20 35
-         C12.4 35 6 28.3 6 18.8
-         C6 10.6 11.6 5 20 5 Z"
-      fill="#d6a97a" stroke="#6c4427" stroke-width="1.5"/>
-<ellipse cx="14.2" cy="10.8" rx="5.2" ry="3" fill="rgba(255,255,255,0.17)" transform="rotate(-18 14.2 10.8)"/>
-<path d="M20 4 L21.2 7.2 L24.6 7.2 L21.9 9.1 L23 12.2 L20 10.4 L17 12.2 L18.1 9.1 L15.4 7.2 L18.8 7.2 Z"
-      fill="#ddf6ff" stroke="#7fd9ff" stroke-width=".8"/>
-<path d="M11.8 17 Q14.2 15.6 16.6 16.9" stroke="#285269" stroke-width="1.7" fill="none" stroke-linecap="round"/>
-<path d="M23.4 16.9 Q25.8 15.6 28.2 17" stroke="#285269" stroke-width="1.7" fill="none" stroke-linecap="round"/>
-<ellipse cx="14.7" cy="19.8" rx="2.7" ry="3" fill="white"/>
-<ellipse cx="25.3" cy="19.8" rx="2.7" ry="3" fill="white"/>
-<circle cx="14.8" cy="19.9" r="1.35" fill="#17415d"/>
-<circle cx="25.2" cy="19.9" r="1.35" fill="#17415d"/>
-<circle cx="14.2" cy="19" r=".4" fill="white"/>
-<circle cx="24.6" cy="19" r=".4" fill="white"/>
-<path d="M15.2 29.8 Q20 31.1 24.8 29.8" stroke="#285269" stroke-width="1.9" fill="none" stroke-linecap="round"/>
+<path d="M20 5C28.4 5 34 10.6 34 18.8C34 28.3 27.6 35 20 35C12.4 35 6 28.3 6 18.8C6 10.6 11.6 5 20 5Z" fill="#8e6a44" stroke="#3e2210" stroke-width="1.5"/>
+<path d="M20 33C13 33 6 27 6 22C12 25 28 25 34 22C33 28 27 33 20 33Z" fill="rgba(0,0,0,0.30)"/>
+<path d="M20 5C28.4 5 34 10.6 34 18.8C28 15.5 12 15.5 6 18.8C6 10.6 11.6 5 20 5Z" fill="rgba(80,238,255,0.24)"/>
+<ellipse cx="14" cy="10" rx="5.8" ry="3.2" fill="rgba(255,255,255,0.34)" transform="rotate(-18 14 10)"/>
+<path d="M20 3L21.5 7.5L26 7.5L22.5 10L24 14L20 11.5L16 14L17.5 10L14 7.5L18.5 7.5Z" fill="#e0faff" stroke="#18c8e0" stroke-width="1"/>
+<path d="M11.8 17Q14.2 15.6 16.6 16.9" stroke="#063040" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M23.4 16.9Q25.8 15.6 28.2 17" stroke="#063040" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<ellipse cx="14.7" cy="20" rx="2.8" ry="3.1" fill="white"/>
+<ellipse cx="25.3" cy="20" rx="2.8" ry="3.1" fill="white"/>
+<circle cx="14.8" cy="20.2" r="1.45" fill="#063040"/>
+<circle cx="25.2" cy="20.2" r="1.45" fill="#063040"/>
+<circle cx="14" cy="19" r=".45" fill="white"/>
+<circle cx="24.5" cy="19" r=".45" fill="white"/>
+<path d="M15 30Q20 31.5 25 30" stroke="#063040" stroke-width="1.9" fill="none" stroke-linecap="round"/>
 </svg>`,
 
-/* ☠️ p2 독 감자 — 울퉁불퉁 비대칭 악동 */
+/* ☠️ p2 초록 — 에메랄드 독 버블 */
 `<svg viewBox="0 0 40 40">
-<path d="M18 4 C24 3 30 6 33 12 C36 19 34 28 28 33 C22 37 13 37 8 31 C4 25 5 16 9 10 C12 6 15 4 18 4Z"
-  fill="#c48a54" stroke="#4d2e15" stroke-width="1.4"/>
-<ellipse cx="13" cy="10" rx="4.5" ry="2.3" fill="rgba(255,255,255,0.11)" transform="rotate(-20 13 10)"/>
-<circle cx="9" cy="18" r=".8" fill="#8a5a34" opacity=".4"/>
-<circle cx="30" cy="16" r=".9" fill="#8a5a34" opacity=".45"/>
-<circle cx="27" cy="30" r=".7" fill="#8a5a34" opacity=".35"/>
-<circle cx="31" cy="11" r="3.2" fill="rgba(74,222,128,0.45)"/>
-<circle cx="7" cy="25" r="2" fill="rgba(74,222,128,0.3)"/>
-<path d="M10 19 Q13.5 17 16 19.5" stroke="#2d4a10" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-<ellipse cx="25" cy="19.5" rx="3.3" ry="3.5" fill="white"/>
-<circle cx="25.5" cy="20" r="1.7" fill="#2d4a10"/>
-<circle cx="24.5" cy="18.8" r=".5" fill="white"/>
-<path d="M13 27 Q19 33 27 27" stroke="#2d4a10" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-<ellipse cx="20" cy="30.5" rx="3.2" ry="2.2" fill="#ff5a7a"/>
-<line x1="20" y1="28.5" x2="20" y2="32.5" stroke="#c9254d" stroke-width="1"/>
+<path d="M18 4C24 3 30 6 33 12C36 19 34 28 28 33C22 37 13 37 8 31C4 25 5 16 9 10C12 6 15 4 18 4Z" fill="#8a5a30" stroke="#2d1205" stroke-width="1.4"/>
+<path d="M20 31C12 31 4 26 8 31C13 37 22 37 28 33C34 29 30 31 20 31Z" fill="rgba(0,0,0,0.32)"/>
+<path d="M18 4C24 3 30 6 33 12C27 9.5 11 9.5 9 12C12 6 15 4 18 4Z" fill="rgba(40,204,96,0.22)"/>
+<ellipse cx="12.5" cy="9.5" rx="5" ry="2.6" fill="rgba(255,255,255,0.28)" transform="rotate(-20 12.5 9.5)"/>
+<circle cx="31.5" cy="10.5" r="4" fill="rgba(28,204,80,0.65)"/>
+<circle cx="31.5" cy="10.5" r="2.2" fill="rgba(80,255,140,0.50)"/>
+<circle cx="31.5" cy="10.5" r=".8" fill="rgba(200,255,220,0.70)"/>
+<circle cx="7" cy="25" r="2.8" fill="rgba(28,204,80,0.50)"/>
+<circle cx="7" cy="25" r="1.4" fill="rgba(80,255,140,0.40)"/>
+<path d="M10 19Q13.5 17 16 19.5" stroke="#082c14" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<ellipse cx="25" cy="19.5" rx="3.4" ry="3.6" fill="white"/>
+<circle cx="25.5" cy="20" r="1.8" fill="#082c14"/>
+<circle cx="24.5" cy="18.8" r=".55" fill="white"/>
+<path d="M13 27Q19 33 27 27" stroke="#082c14" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<ellipse cx="20" cy="30.5" rx="3.2" ry="2.2" fill="#ff4466"/>
+<line x1="20" y1="28.5" x2="20" y2="32.5" stroke="#aa0830" stroke-width="1"/>
 </svg>`,
 
-/* ⚡ p3 번개 감자 — path 기반 세로형 */
+/* ⚡ p3 노랑 — 앰버 번개 */
 `<svg viewBox="0 0 40 40">
-<path d="M20 3
-         C24.5 3 28.5 5.2 30.8 9.6
-         C33.6 15 33.4 24.6 30.4 30
-         C27.8 34.5 24.2 36.5 20 36.5
-         C15.7 36.5 12.2 34.6 9.6 30
-         C6.6 24.7 6.3 15 9.2 9.6
-         C11.6 5.2 15.6 3 20 3 Z"
-      fill="#d1a06b" stroke="#5a3518" stroke-width="1.4"/>
-<ellipse cx="14" cy="10" rx="4" ry="2" fill="rgba(255,255,255,0.12)" transform="rotate(-15 14 10)"/>
-<circle cx="10" cy="19" r=".8" fill="#8a5a34" opacity=".4"/>
-<circle cx="28" cy="16" r=".9" fill="#8a5a34" opacity=".45"/>
-<path d="M17 1 L23.5 1 L20.5 8.5 L26 8.5 L16.5 19 L19 10.5 L14.5 10.5 Z"
-      fill="#fde047" stroke="#e8a800" stroke-width=".8"/>
-<rect x="8.5" y="18" width="10" height="6.5" rx="3" fill="#111827" stroke="rgba(255,255,255,0.15)" stroke-width=".6"/>
-<rect x="21.5" y="18" width="10" height="6.5" rx="3" fill="#111827" stroke="rgba(255,255,255,0.15)" stroke-width=".6"/>
-<line x1="18.5" y1="20.5" x2="21.5" y2="20.5" stroke="#111827" stroke-width="2.5" stroke-linecap="round"/>
-<line x1="10.5" y1="19.5" x2="16" y2="22.5" stroke="rgba(255,255,255,0.22)" stroke-width=".8"/>
-<line x1="24" y1="19.5" x2="29.5" y2="22.5" stroke="rgba(255,255,255,0.22)" stroke-width=".8"/>
-<path d="M12 30 Q20 36 28 30" stroke="#4a2c15" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+<path d="M20 3C24.5 3 28.5 5.2 30.8 9.6C33.6 15 33.4 24.6 30.4 30C27.8 34.5 24.2 36.5 20 36.5C15.7 36.5 12.2 34.6 9.6 30C6.6 24.7 6.3 15 9.2 9.6C11.6 5.2 15.6 3 20 3Z" fill="#906030" stroke="#2d1205" stroke-width="1.4"/>
+<path d="M20 34C14 34 7 29 9.6 30C12.2 34.6 15.7 36.5 20 36.5C24.2 36.5 27.8 34.5 30.4 30C32 29 26 34 20 34Z" fill="rgba(0,0,0,0.30)"/>
+<path d="M20 3C24.5 3 28.5 5.2 30.8 9.6C26 8 14 8 9.2 9.6C11.6 5.2 15.6 3 20 3Z" fill="rgba(255,220,32,0.24)"/>
+<ellipse cx="13.5" cy="9.5" rx="4.5" ry="2.4" fill="rgba(255,255,255,0.30)" transform="rotate(-15 13.5 9.5)"/>
+<path d="M16.5 0L24 0L20.5 9L27 9L15.5 21L18.5 11L13 11Z" fill="#ffd020" stroke="#c08800" stroke-width=".9"/>
+<rect x="8.5" y="18.5" width="10" height="6.5" rx="3" fill="#0e1520" stroke="rgba(255,255,255,0.20)" stroke-width=".6"/>
+<rect x="21.5" y="18.5" width="10" height="6.5" rx="3" fill="#0e1520" stroke="rgba(255,255,255,0.20)" stroke-width=".6"/>
+<line x1="18.5" y1="21" x2="21.5" y2="21" stroke="#0e1520" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M12 30Q20 36.5 28 30" stroke="#2d1205" stroke-width="2.4" fill="none" stroke-linecap="round"/>
 </svg>`,
 
-/* ✨ p4 마법 감자 — path 기반 가로형 */
+/* ✨ p4 보라 — 일렉트릭 바이올렛 */
 `<svg viewBox="0 0 40 40">
-<path d="M20 7
-         C28.8 7 35.2 11 36.2 17.8
-         C37.1 24.2 31.8 31.8 20 33.2
-         C8.2 31.8 2.9 24.2 3.8 17.8
-         C4.8 11 11.2 7 20 7 Z"
-      fill="#d8a977" stroke="#5c3520" stroke-width="1.4"/>
-<ellipse cx="15" cy="12" rx="5.5" ry="2.5" fill="rgba(255,255,255,0.14)" transform="rotate(-10 15 12)"/>
-<circle cx="10" cy="19" r=".8" fill="#8a5a34" opacity=".4"/>
-<circle cx="30" cy="17" r=".9" fill="#8a5a34" opacity=".4"/>
-<circle cx="28" cy="29" r=".7" fill="#8a5a34" opacity=".35"/>
-<path d="M9 7 L10.5 10.5 L14.5 10.8 L11.5 13 L12.4 16.7 L9 14.8 L5.6 16.7 L6.5 13 L3.5 10.8 L7.5 10.5 Z"
-      fill="#f9a8d4"/>
-<path d="M29.8 6.2 L31 8.9 L34 9.2 L31.7 11 L32.4 13.9 L29.8 12.4 L27.2 13.9 L27.9 11 L25.6 9.2 L28.6 8.9 Z"
-      fill="#fde68a"/>
+<path d="M20 7C28.8 7 35.2 11 36.2 17.8C37.1 24.2 31.8 31.8 20 33.2C8.2 31.8 2.9 24.2 3.8 17.8C4.8 11 11.2 7 20 7Z" fill="#906030" stroke="#36160a" stroke-width="1.4"/>
+<path d="M20 30.5C12 30.5 3.5 25 3.8 21C10 23.5 30 23.5 36.2 21C35 27 28 30.5 20 30.5Z" fill="rgba(0,0,0,0.28)"/>
+<path d="M20 7C28.8 7 35.2 11 36.2 17.8C30 14.5 10 14.5 3.8 17.8C4.8 11 11.2 7 20 7Z" fill="rgba(152,80,224,0.24)"/>
+<ellipse cx="14.5" cy="11.5" rx="6" ry="3" fill="rgba(255,255,255,0.32)" transform="rotate(-10 14.5 11.5)"/>
+<path d="M9 6.5L10.5 10.5L14.5 10.8L11.5 13L12.4 17L9 15L5.6 17L6.5 13L3.5 10.8L7.5 10.5Z" fill="#c090ff" stroke="#7830c8" stroke-width=".7"/>
+<path d="M29.8 5.5L31 8.9L34 9.2L31.7 11L32.4 14.5L29.8 12.8L27.2 14.5L27.9 11L25.6 9.2L28.6 8.9Z" fill="#d8b0ff" stroke="#7830c8" stroke-width=".7"/>
 <ellipse cx="14.2" cy="19.8" rx="3.4" ry="3.6" fill="white"/>
 <ellipse cx="25.8" cy="19.8" rx="3.4" ry="3.6" fill="white"/>
-<circle cx="14.4" cy="20" r="1.6" fill="#8b5cf6"/>
-<circle cx="25.6" cy="20" r="1.6" fill="#8b5cf6"/>
-<circle cx="13.5" cy="18.8" r=".5" fill="white"/>
-<circle cx="24.7" cy="18.8" r=".5" fill="white"/>
-<path d="M15.2 27.8 Q20 31.2 24.8 27.8" stroke="#7c3aed" stroke-width="2" fill="none" stroke-linecap="round"/>
-<ellipse cx="10.3" cy="23.5" rx="2.1" ry="1.2" fill="rgba(244,114,182,0.18)"/>
-<ellipse cx="29.7" cy="23.5" rx="2.1" ry="1.2" fill="rgba(244,114,182,0.18)"/>
+<circle cx="14.4" cy="20" r="1.7" fill="#2e0868"/>
+<circle cx="25.6" cy="20" r="1.7" fill="#2e0868"/>
+<circle cx="13.5" cy="18.8" r=".55" fill="white"/>
+<circle cx="24.7" cy="18.8" r=".55" fill="white"/>
+<path d="M15.2 27.8Q20 31.2 24.8 27.8" stroke="#2e0868" stroke-width="2" fill="none" stroke-linecap="round"/>
 </svg>`,
 
-/* bomb — 감자형 폭탄 */
+/* 💣 bomb — 칠흑 위협감 */
 `<svg viewBox="0 0 40 40">
-<path d="M20 5
-         C27.5 5 33.5 10 34 18.5
-         C34.5 27.8 28 35 20 35
-         C12 35 5.5 27.8 6 18.5
-         C6.5 10 12.5 5 20 5 Z"
-      fill="#30323a" stroke="#0f172a" stroke-width="1.5"/>
-<ellipse cx="14" cy="11.5" rx="5.2" ry="2.7" fill="rgba(255,255,255,0.10)" transform="rotate(-18 14 11.5)"/>
-<circle cx="10.2" cy="17.2" r=".8" fill="rgba(255,255,255,0.10)"/>
-<circle cx="28.5" cy="15.5" r=".9" fill="rgba(255,255,255,0.08)"/>
-<path d="M23.2 6.6 L27.7 4" stroke="#f59e0b" stroke-width="2.3" stroke-linecap="round"/>
-<path d="M27.2 4.2 Q30.8 4.5 31.4 8" stroke="#94a3b8" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-<path d="M31.5 6
-         C30.8 3.7 33.8 2.8 34 5.8
-         C34.1 7.8 32.2 8.3 31.5 6 Z"
-      fill="#ff7a1a"/>
-<path d="M32.1 5.1 C31.9 6 32.5 6.5 32.3 7.4 C33.1 6.8 33.2 5.9 32.1 5.1 Z"
-      fill="#ffe27a"/>
-<ellipse cx="14.5" cy="20.2" rx="2.9" ry="3.1" fill="white"/>
-<ellipse cx="25.5" cy="20.2" rx="2.9" ry="3.1" fill="white"/>
-<circle cx="14.8" cy="20.5" r="1.5" fill="#111827"/>
-<circle cx="25.2" cy="20.5" r="1.5" fill="#111827"/>
+<path d="M20 5C27.5 5 33.5 10 34 18.5C34.5 27.8 28 35 20 35C12 35 5.5 27.8 6 18.5C6.5 10 12.5 5 20 5Z" fill="#18191e" stroke="#05060a" stroke-width="1.6"/>
+<path d="M20 33C12 33 5.5 26 6 20C12 23 28 23 34 20C34 26 28 33 20 33Z" fill="rgba(0,0,0,0.55)"/>
+<path d="M20 5C27.5 5 33.5 10 34 18.5C28 15 12 15 6 18.5C6.5 10 12.5 5 20 5Z" fill="rgba(255,255,255,0.06)"/>
+<ellipse cx="13.5" cy="11" rx="6" ry="3" fill="rgba(255,255,255,0.10)" transform="rotate(-18 13.5 11)"/>
+<path d="M23.2 6.6L27.7 4" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M27.2 4.2Q30.8 4.5 31.4 8" stroke="#8090a8" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M31.5 6C30.8 3.7 33.8 2.8 34 5.8C34.1 7.8 32.2 8.3 31.5 6Z" fill="#ff7a1a"/>
+<path d="M32.1 5.1C31.9 6 32.5 6.5 32.3 7.4C33.1 6.8 33.2 5.9 32.1 5.1Z" fill="#ffe27a"/>
+<ellipse cx="14.5" cy="20.2" rx="2.9" ry="3.1" fill="rgba(255,255,255,0.92)"/>
+<ellipse cx="25.5" cy="20.2" rx="2.9" ry="3.1" fill="rgba(255,255,255,0.92)"/>
+<circle cx="14.8" cy="20.5" r="1.5" fill="#050810"/>
+<circle cx="25.2" cy="20.5" r="1.5" fill="#050810"/>
 <circle cx="14.1" cy="19.5" r=".45" fill="white"/>
 <circle cx="24.5" cy="19.5" r=".45" fill="white"/>
-<path d="M15 27.5 Q20 30 25 27.5" stroke="#f97316" stroke-width="2" fill="none" stroke-linecap="round"/>
+<path d="M15 27.5Q20 30 25 27.5" stroke="#f97316" stroke-width="2.2" fill="none" stroke-linecap="round"/>
 </svg>`,
 
-/* rainbow — 황금 감자 + 프리즘 아치 */
+/* 🌈 rainbow — pearl 황금 광채 */
 `<svg viewBox="0 0 40 40">
-<path d="M20 5
-         C28 5 34 10.5 34 19
-         C34 28.5 27 35 20 35
-         C13 35 6 28.5 6 19
-         C6 10.5 12 5 20 5 Z"
-      fill="#e8c88a" stroke="#7a5230" stroke-width="1.4"/>
-<ellipse cx="14" cy="10.5" rx="5" ry="2.5" fill="rgba(255,255,255,0.15)" transform="rotate(-15 14 10.5)"/>
-<circle cx="10" cy="17" r=".8" fill="#8a5a34" opacity=".4"/>
-<circle cx="29" cy="15" r=".9" fill="#8a5a34" opacity=".4"/>
-<path d="M9 12 Q20 5 31 12" stroke="#ef4444" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-<path d="M11 14.5 Q20 9 29 14.5" stroke="#f59e0b" stroke-width="1.3" fill="none" stroke-linecap="round"/>
-<path d="M13 16.8 Q20 12.5 27 16.8" stroke="#22c55e" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+<path d="M20 5C28 5 34 10.5 34 19C34 28.5 27 35 20 35C13 35 6 28.5 6 19C6 10.5 12 5 20 5Z" fill="#c09040" stroke="#5a3010" stroke-width="1.4"/>
+<path d="M20 33C13 33 6 27 6 21C12 24 28 24 34 21C34 27 27 33 20 33Z" fill="rgba(0,0,0,0.22)"/>
+<path d="M20 5C28 5 34 10.5 34 19C28 16 12 16 6 19C6 10.5 12 5 20 5Z" fill="rgba(255,240,140,0.30)"/>
+<ellipse cx="13.5" cy="10" rx="5.5" ry="3" fill="rgba(255,255,255,0.42)" transform="rotate(-15 13.5 10)"/>
+<path d="M8 12.5Q20 4 32 12.5" stroke="#ff4444" stroke-width="2" fill="none" stroke-linecap="round"/>
+<path d="M10 15.2Q20 8 30 15.2" stroke="#f59e0b" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+<path d="M12 17.8Q20 12.5 28 17.8" stroke="#22c55e" stroke-width="1.3" fill="none" stroke-linecap="round"/>
 <ellipse cx="14.5" cy="21" rx="3" ry="3.2" fill="white"/>
 <ellipse cx="25.5" cy="21" rx="3" ry="3.2" fill="white"/>
-<circle cx="14.7" cy="21.3" r="1.5" fill="#7c3aed"/>
-<circle cx="25.3" cy="21.3" r="1.5" fill="#7c3aed"/>
+<circle cx="14.7" cy="21.3" r="1.5" fill="#5010a0"/>
+<circle cx="25.3" cy="21.3" r="1.5" fill="#5010a0"/>
 <circle cx="13.8" cy="20" r=".45" fill="white"/>
 <circle cx="24.6" cy="20" r=".45" fill="white"/>
-<path d="M14.5 28 Q20 32 25.5 28" stroke="#7c3aed" stroke-width="2" fill="none" stroke-linecap="round"/>
-<circle cx="8" cy="22" r="1.2" fill="rgba(253,224,71,0.6)"/>
-<circle cx="32" cy="22" r="1.2" fill="rgba(253,224,71,0.6)"/>
+<path d="M14.5 28Q20 32 25.5 28" stroke="#5010a0" stroke-width="2" fill="none" stroke-linecap="round"/>
 </svg>`
 ];
-
 const TYPE_CLASS = ['p0','p1','p2','p3','p4','p-bomb','p-rainbow'];
 
 /* ════════════════════════════════════════════════
    게임 상태
 ════════════════════════════════════════════════ */
 let board=[], score=0, timeLeft=GAME_SEC, playsLeft=7;
+/* ── P2E 서버 검증용 세션 ──────────────────────────
+   gameSession : 서버에서 발급한 sessionId/nonce/serverStartAt 보관.
+   actions     : 게임 중 원시 이벤트 로그 (스왑 성공/실패 기록).
+   _serverResult: submitGameResult 응답 캐시 — 결과창 렌더 전용.
+─────────────────────────────────────────────────── */
+let gameSession = null;
+let actions     = [];
+let _serverResult = null;
 let adBoostOn=true, combo=0, maxCombo=0;
 let isAnimating=false;          // 파트1-1: 입력 락 플래그
 let selected=null;              // {r, c}
 let gameTimer=null, comboTimer=null;
 let isFever=false, feverLeft=0, feverTmr=null;
 let overlayTmr=null, overlayStats={gold:0,clock:0,star:0};
-let eventActive=null, rushColor=-1, eventTmrs=[];
+let usedDiamond=false, usedAd=false; // 연장 1회 제한 — startGame()에서 false로 초기화
 let hasPlayed=false;
-let usedDiamond=false, usedAd=false; // 연장 1회 제한
+let isLastRush=false, lastRushTriggered=false, scoreAtRushStart=0;
+
+/* ── Last Rush + Anticipation 헬퍼 ─────────────────
+   getComboWindow: 현재 상태에 따라 콤보 창 길이 반환.
+   ┌─────────────────┬──────────────────────────────┐
+   │ 상태             │ 콤보 창                       │
+   ├─────────────────┼──────────────────────────────┤
+   │ 기본             │ BASE_COMBO_WINDOW (850ms)     │
+   │ anticipation     │ +ANTCP_COMBO_WINDOW (+80ms)   │
+   │ lastRush         │ +LR_COMBO_BONUS (+200ms)      │
+   │ 둘 다 (최대)     │ +280ms — 300ms 한도 내 유지   │
+   └─────────────────┴──────────────────────────────┘
+────────────────────────────────────────────────── */
+function lrLog(...args){ if(LR_DEBUG) console.log('[LastRush]', ...args); }
+function getComboWindow(){
+  let w=BASE_COMBO_WINDOW;
+  if(isNearFever) w+=ANTCP_COMBO_WINDOW; // combo 4: 콤보가 조금 더 잘 이어짐
+  if(isLastRush)  w+=LR_COMBO_BONUS;     // 라스트 10초: 추가 완화
+  return w;
+}
+
+/* ── Near-Miss 상태 ──
+   nmLastTime : 마지막 연출 발동 시각 (쿨다운 기준)
+   nmStats    : QA 카운터 (fail/detect/fire/cooldown) */
+let nmLastTime=0;
+let nmStats={fail:0,detect:0,fire:0,cooldown:0,skip:0};
+
+function nmLog(...args){ if(NM_DEBUG) console.log('[NearMiss]', ...args); }
+
+/* ── Anticipation 상태 ──────────────────────────
+   isNearFever    : combo===ANTCP_COMBO && !isFever 시 true
+   nearFeverEntry : 진입 시각 (QA 체류시간 측정용) */
+let isNearFever=false;
+let nearFeverEntry=0;
+
+function antcpLog(...args){ if(ANTCP_DEBUG) console.log('[Anticipation]', ...args); }
+
+/* ── Feel 상태 ──────────────────────────────────
+   스와이프 감지용 상태. initBoardDOM에서 리셋.
+   _feelSwapT0: 스왑 시작 시각 (재입력 가능까지 경과 측정용)
+────────────────────────────────────────────────── */
+let swipeOriginR=-1, swipeOriginC=-1;
+let swipeStartX=0, swipeStartY=0;
+let swipeFired=false;
+let _feelSwapT0=0;
+let _activePointerId=-1; // 멀티터치 가드: 첫 번째 포인터만 처리
+
+function feelLog(...args){ if(FEEL_DEBUG) console.log('[Feel]', ...args); }
+
+/* enterNearFever: combo 4 진입 시 1회만 호출.
+   fever-gauge에 near-fever 클래스 추가.
+   CSS만으로 처리 — JS 애니메이션 루프 없음. */
+function enterNearFever(){
+  if(isNearFever||isFever) return;
+  isNearFever=true;
+  nearFeverEntry=Date.now();
+  const fg=document.getElementById('fever-gauge');
+  if(fg) fg.classList.add('near-fever');
+  antcpLog('진입', 'combo='+combo, 'gauge=80%', 'comboWindow='+getComboWindow()+'ms', 'timeLeft='+timeLeft);
+}
+
+/* exitNearFever: 피버 진입 성공 또는 콤보 끊김 시 호출.
+   reachedFever: 피버로 진입했는지 여부 (QA 로그용) */
+function exitNearFever(reachedFever){
+  if(!isNearFever) return;
+  const dur=((Date.now()-nearFeverEntry)/1000).toFixed(1);
+  isNearFever=false;
+  nearFeverEntry=0;
+  const fg=document.getElementById('fever-gauge');
+  if(fg) fg.classList.remove('near-fever');
+  antcpLog('해제', reachedFever?'피버 성공':'미도달', '체류='+dur+'s', 'timeLeft='+timeLeft);
+}
+
+/* checkNearMiss: 실패 스왑 두 셀 + 직접 인접셀만 검사.
+   가로/세로 방향으로 같은 타입 2개 연속 → near-miss 판정.
+   전체 보드 탐색 금지 — 스왑 인접 소구역만. */
+/* checkNearMiss: 실패 스왑 주변에 2-in-a-row 패턴이 있는지 판정.
+   판정만 한다 — 어느 셀을 보여줄지와 완전 분리. */
+function checkNearMiss(r1,c1,r2,c2){
+  const pts=new Set();
+  for(const [r,c] of [[r1,c1],[r2,c2]]){
+    pts.add(r*COLS+c);
+    for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+      const nr=r+dr,nc=c+dc;
+      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) pts.add(nr*COLS+nc);
+    }
+  }
+  for(const k of pts){
+    const r=Math.floor(k/COLS),c=k%COLS;
+    const t=board[r][c].type;
+    if(t<0||t>=TYPE_BOMB) continue;
+    for(const [dr,dc] of [[0,1],[1,0]]){
+      let cnt=1;
+      for(let i=1;i<=2;i++){
+        const nr=r+dr*i,nc=c+dc*i;
+        if(nr<0||nr>=ROWS||nc<0||nc>=COLS) break;
+        if(board[nr][nc].type===t)cnt++; else break;
+      }
+      for(let i=1;i<=2;i++){
+        const nr=r-dr*i,nc=c-dc*i;
+        if(nr<0||nr>=ROWS||nc<0||nc>=COLS) break;
+        if(board[nr][nc].type===t)cnt++; else break;
+      }
+      if(cnt>=2) return true;
+    }
+  }
+  return false;
+}
+
+/* pickNearMissCells: near-miss 연출 대상 셀 선택 — 비정보 위치.
+   실패 좌표(r1,c1,r2,c2)를 연출에 사용하지 않는다.
+   ─────────────────────────────────────────────────────
+   선택 기준 (모두 충족해야 후보):
+   1. 실패 셀 자체 제외
+   2. 동일 행/열 제외 — 방향성 단서 차단
+   3. 두 실패 셀 모두로부터 맨해튼 거리 ≥3
+   4. 일반 셀(type 0~4), 오버레이 없음
+   후보 없으면 빈 배열 반환 → 연출 생략. */
+function pickNearMissCells(r1,c1,r2,c2){
+  const cands=[];
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(r===r1&&c===c1) continue;          // 실패 셀 제외
+      if(r===r2&&c===c2) continue;
+      if(r===r1||r===r2) continue;          // 동일 행 제외 (방향 단서 차단)
+      if(c===c1||c===c2) continue;          // 동일 열 제외 (방향 단서 차단)
+      if(Math.abs(r-r1)+Math.abs(c-c1)<3) continue; // 거리 < 3 제외
+      if(Math.abs(r-r2)+Math.abs(c-c2)<3) continue;
+      const cell=board[r]?.[c];
+      if(!cell||cell.type<0||cell.type>=TYPE_BOMB||cell.overlay) continue;
+      cands.push({r,c});
+    }
+  }
+  if(!cands.length) return [];
+  // 후보 중 1개 무작위 선택
+  return [cands[Math.floor(Math.random()*cands.length)]];
+}
+
+/* fireNearMiss: near-miss 연출 실행.
+   셀 위치 정보 일절 노출 하지 않음.
+   board-wrap 전체 opacity flash + nearMiss SFX만. */
+function fireNearMiss(r1,c1,r2,c2){
+  // pickNearMissCells는 후보 검증용으로만 유지 (연출에는 미사용)
+  const targets=pickNearMissCells(r1,c1,r2,c2);
+  // 후보 없으면 skip (판정 기준 유지)
+  if(!targets.length){
+    nmStats.skip++;
+    nmLog('연출 생략(후보 없음)', `skip=${nmStats.skip}`);
+    return;
+  }
+  // board-wrap 전체 flash — 위치 정보 없음
+  const bw=document.querySelector('.board-wrap');
+  if(bw){
+    bw.classList.remove('nm-flash');
+    void bw.offsetWidth;
+    bw.classList.add('nm-flash');
+    setTimeout(()=>bw.classList.remove('nm-flash'), 320);
+  }
+  AudioSys.sfx.nearMiss(); // 아주 작은 심리 완충음
+  nmStats.fire++;
+  nmLog('연출 발동(board flash)', `fire=${nmStats.fire}`);
+}
+
+/* onFailedSwap: trySwap 실패 분기에서 호출.
+   쿨다운 → 판정 → 확률 → 연출 파이프라인. */
+function onFailedSwap(r1,c1,r2,c2){
+  nmStats.fail++;
+  const now=Date.now();
+  if(now-nmLastTime<NM_COOLDOWN_MS){
+    nmStats.cooldown++;
+    nmLog('쿨다운 차단', `남은 ${((NM_COOLDOWN_MS-(now-nmLastTime))/1000).toFixed(1)}s`, `cooldown=${nmStats.cooldown}`);
+    return;
+  }
+  const isNM=checkNearMiss(r1,c1,r2,c2);
+  if(isNM) nmStats.detect++;
+  nmLog('판정', isNM?'NEAR-MISS':'없음', `fail=${nmStats.fail} detect=${nmStats.detect}`);
+  if(!isNM) return;
+  if(Math.random()>NM_FIRE_PROB){
+    nmLog('확률 필터 탈락');
+    return;
+  }
+  nmLastTime=now;
+  fireNearMiss(r1,c1,r2,c2);
+}
 
 /* ════════════════════════════════════════════════
    파트1-1: DOM Pool — 49개 셀을 최초 1회만 생성
@@ -1172,19 +1888,68 @@ const STEP = ()=> CELL_H + GRID_GAP;
 
 function initBoardDOM(){
   const el=document.getElementById('board');
-  el.innerHTML=''; // 최초 1회만 초기화
+  el.innerHTML='';
   cellEls=[];
   for(let r=0;r<ROWS;r++){
     cellEls[r]=[];
     for(let c=0;c<COLS;c++){
       const div=document.createElement('div');
       div.className='cell';
-      div.style.willChange='transform,opacity'; // 하드웨어 가속
-      div.addEventListener('pointerdown',e=>{e.preventDefault();onCell(r,c);},{passive:false});
+      div.style.willChange='transform,opacity';
+      div.dataset.r=r; div.dataset.c=c; // 보드 레벨 히트테스트용
       el.appendChild(div);
       cellEls[r][c]=div;
     }
   }
+
+  /* ── 보드 단일 리스너 구조 ────────────────────────
+     pointerdown: 탭 + 스와이프 시작점 기록
+     pointermove: SWIPE_THRESHOLD_PX 초과 + 축 명확 → onCell 호출
+     pointerup/cancel: 스와이프 상태 리셋
+     setPointerCapture: 보드 밖으로 이동해도 move 수신
+     개별 셀 리스너 49개 → 보드 레벨 3개로 통합.
+  ─────────────────────────────────────────────── */
+  el.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    // 멀티터치 가드: 두 번째 손가락 무시
+    if(_activePointerId!==-1 && e.pointerId!==_activePointerId) return;
+    _activePointerId=e.pointerId;
+    el.setPointerCapture(e.pointerId);
+    const target=e.target.closest('[data-r]');
+    if(!target) return;
+    const r=+target.dataset.r, c=+target.dataset.c;
+    swipeOriginR=r; swipeOriginC=c;
+    swipeStartX=e.clientX; swipeStartY=e.clientY;
+    swipeFired=false;
+    onCell(r,c);
+    feelLog('입력', `(${r},${c})`);
+  },{passive:false});
+
+  el.addEventListener('pointermove', e=>{
+    if(e.pointerId!==_activePointerId) return; // 추적 중인 포인터만
+    if(swipeOriginR<0||swipeFired||isAnimating||timeLeft<=0) return;
+    const dx=e.clientX-swipeStartX, dy=e.clientY-swipeStartY;
+    const adx=Math.abs(dx), ady=Math.abs(dy);
+    if(Math.sqrt(adx*adx+ady*ady)<SWIPE_THRESHOLD_PX) return;
+    // 우세축으로 즉시 발동 — 축비율 체크 없음.
+    // 대각선 스와이프를 거부하면 "입력이 씹혔다"는 억울함 발생.
+    // 어떤 방향이든 threshold 초과 시점에 항상 결과를 돌려줌.
+    let tr=swipeOriginR, tc=swipeOriginC;
+    if(adx>ady) tc+=dx>0?1:-1;
+    else         tr+=dy>0?1:-1;
+    if(tr>=0&&tr<ROWS&&tc>=0&&tc<COLS){
+      swipeFired=true;
+      feelLog('스와이프', `(${swipeOriginR},${swipeOriginC})→(${tr},${tc})`, `dx=${dx.toFixed(0)} dy=${dy.toFixed(0)}`);
+      onCell(tr,tc);
+    }
+  },{passive:true});
+
+  el.addEventListener('pointerup', e=>{
+    if(e.pointerId===_activePointerId) { swipeOriginR=-1; _activePointerId=-1; }
+  },{passive:true});
+  el.addEventListener('pointercancel', e=>{
+    if(e.pointerId===_activePointerId) { swipeOriginR=-1; _activePointerId=-1; }
+  },{passive:true});
 }
 
 /** 단일 셀 DOM 업데이트 (innerHTML + className만 교체) */
@@ -1193,21 +1958,43 @@ function updateCell(r,c){
   const el=cellEls[r][c];
   if(t<0){el.className='cell';el.innerHTML='';return;}
   const ov=board[r][c].overlay;
-  el.className='cell '+TYPE_CLASS[t]+(ov?' has-'+ov:'')+(eventActive==='rush'&&t===rushColor?' rush-target':'');
+  el.className='cell '+TYPE_CLASS[t]+(ov?' has-'+ov:'');
   let html=SVG_DATA[t]||'';
   if(ov){const ic={gold:'💰',clock:'⏰',star:'⭐'};html+=`<div class="cell-ov">${ic[ov]}</div>`;}
   el.innerHTML=html;
 }
 
 /** 전체 보드 DOM 업데이트 */
+/* warnPerf: duration 측정 후 threshold 초과 시 warn
+   16.7ms = 60fps 프레임 예산 | 50ms = long task 기준 */
+function warnPerf(label, startMark, endMark, threshold){
+  try{
+    const ms = performance.measure(label, startMark, endMark).duration;
+    if(ms > threshold) console.warn('[PERF]', label, ms.toFixed(1)+'ms', threshold>=50?'(long task)':'');
+  }catch(e){}
+}
+
 function updateAll(){
+  // TODO: replace with pre-mounted SVG switching if telemetry confirms DOM bottleneck
+  performance.mark('updateAll_start');
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++) updateCell(r,c);
+  performance.mark('updateAll_end');
+  warnPerf('updateAll','updateAll_start','updateAll_end', 16.7);
+  performance.clearMarks('updateAll_start');
+  performance.clearMarks('updateAll_end');
+  performance.clearMeasures('updateAll');
 }
 
 /* ════════════════════════════════════════════════
    보드 데이터 초기화
 ════════════════════════════════════════════════ */
-function randType(){return Math.floor(Math.random()*5);}
+/* randType: 일반 5종 랜덤.
+   ※ lastRush 특수블록 직접 스폰 제거 — 보드 폭탄은 4-match로만 생성해야 함.
+      랜덤 스폰 시 유저가 쓸 수 없는 "잠긴 셀"이 되는 설계 오류.
+      lastRush 긴장감은 overlay 추가 스폰 1회로만 처리. */
+function randType(){
+  return Math.floor(Math.random()*5);
+}
 
 function initBoard(){
   board=Array.from({length:ROWS},()=>Array.from({length:COLS},()=>({type:randType()})));
@@ -1221,15 +2008,21 @@ function initBoard(){
 }
 
 /* ════════════════════════════════════════════════
-   입력 처리 (파트1-1: isAnimating 락)
+   입력 처리
+   isAnimating 중: 첫 번째 선택(origin)은 허용.
+   두 번째 탭(swap 트리거)은 차단 → 상태 안전 유지.
+   효과: 애니메이션이 끝나는 순간 한 번의 탭/스와이프로 즉시 발동.
 ════════════════════════════════════════════════ */
 function onCell(r,c){
-  if(isAnimating||timeLeft<=0)return;
+  if(timeLeft<=0)return;
   const el=cellEls[r][c];
   if(selected===null){
+    // 첫 번째 선택: 애니메이션 중에도 허용 (pre-selection)
     selected={r,c};
     el.classList.add('selected');
   }else{
+    // 두 번째 탭(swap 실행): 애니메이션 완료 후에만
+    if(isAnimating)return;
     const prev=cellEls[selected.r][selected.c];
     if(prev)prev.classList.remove('selected');
     if(selected.r===r&&selected.c===c){selected=null;return;}
@@ -1245,46 +2038,72 @@ function onCell(r,c){
 }
 
 /* ════════════════════════════════════════════════
-   파트1-2: 부드러운 스왑 애니메이션
-   transform:translate() + transition으로 슬라이드
+   스왑 애니메이션 (타이밍은 FEEL 상수로 제어)
 ════════════════════════════════════════════════ */
 async function trySwap(r1,c1,r2,c2){
   isAnimating=true;
+  _feelSwapT0=Date.now();
   const el1=cellEls[r1][c1], el2=cellEls[r2][c2];
 
-  // 픽셀 오프셋 계산
-  const rect1=el1.getBoundingClientRect(), rect2=el2.getBoundingClientRect();
-  const dx=rect2.left-rect1.left, dy=rect2.top-rect1.top;
+  try{
+    const rect1=el1.getBoundingClientRect(), rect2=el2.getBoundingClientRect();
+    const dx=rect2.left-rect1.left, dy=rect2.top-rect1.top;
 
-  // 데이터 스왑
-  [board[r1][c1],board[r2][c2]]=[board[r2][c2],board[r1][c1]];
-  const matches=findMatches();
-
-  if(matches.length>0){
-    /* 유효 스왑: 가속감 있는 슬라이드 */
-    el1.style.transition='transform 0.12s cubic-bezier(.4,0,.2,1)';
-    el2.style.transition='transform 0.12s cubic-bezier(.4,0,.2,1)';
-    el1.style.zIndex='10'; el2.style.zIndex='9';
-    el1.style.transform=`translate(${dx}px,${dy}px)`;
-    el2.style.transform=`translate(${-dx}px,${-dy}px)`;
-    await sleep(125);
-    // 스왑 완료: 시각 원위치 + 내용 교체
-    [el1,el2].forEach(e=>{e.style.transition='none';e.style.transform='';e.style.zIndex='';});
-    updateCell(r1,c1); updateCell(r2,c2);
-    await processMatches(matches);
-  }else{
-    /* 실패 스왑: 짧게 밀렸다 탄성 복귀 */
     [board[r1][c1],board[r2][c2]]=[board[r2][c2],board[r1][c1]];
-    el1.style.transition='transform 0.08s ease-out';
-    el2.style.transition='transform 0.08s ease-out';
-    el1.style.transform=`translate(${dx*.25}px,${dy*.25}px)`;
-    el2.style.transform=`translate(${-dx*.25}px,${-dy*.25}px)`;
-    await sleep(85);
-    el1.style.transition='transform 0.1s cubic-bezier(.25,1.4,.55,1)';
-    el2.style.transition='transform 0.1s cubic-bezier(.25,1.4,.55,1)';
-    el1.style.transform=''; el2.style.transform='';
-    await sleep(105);
-    [el1,el2].forEach(e=>{e.style.transition='';e.style.zIndex='';});
+    const matches=findMatches();
+
+    if(matches.length>0){
+      /* 성공 스왑 */
+      actions.push({t:Date.now(),type:'swap_ok',r1,c1,r2,c2,combo});
+      feelLog('스왑시작', '성공', `(${r1},${c1})↔(${r2},${c2})`);
+      el1.style.transition=`transform ${SWAP_OK_DUR} var(--ease-snap)`;
+      el2.style.transition=`transform ${SWAP_OK_DUR} var(--ease-snap)`;
+      el1.style.zIndex='10'; el2.style.zIndex='9';
+      el1.style.transform=`translate(${dx}px,${dy}px)`;
+      el2.style.transform=`translate(${-dx}px,${-dy}px)`;
+      await sleep(SWAP_OK_WAIT);
+      [el1,el2].forEach(e=>{e.style.transition='none';e.style.transform='';e.style.zIndex='';});
+      updateCell(r1,c1); updateCell(r2,c2);
+      await processMatches(matches);
+    }else{
+      /* 실패 스왑 */
+      feelLog('스왑시작', '실패', `(${r1},${c1})↔(${r2},${c2})`);
+      [board[r1][c1],board[r2][c2]]=[board[r2][c2],board[r1][c1]];
+      el1.style.transition=`transform ${SWAP_FAIL_PUSH_DUR} var(--ease-weight)`;
+      el2.style.transition=`transform ${SWAP_FAIL_PUSH_DUR} var(--ease-weight)`;
+      el1.style.transform=`translate(${dx*SWAP_FAIL_PUSH_RATIO}px,${dy*SWAP_FAIL_PUSH_RATIO}px)`;
+      el2.style.transform=`translate(${-dx*SWAP_FAIL_PUSH_RATIO}px,${-dy*SWAP_FAIL_PUSH_RATIO}px)`;
+      await sleep(SWAP_FAIL_PUSH_WAIT);
+      el1.style.transition=`transform ${SWAP_FAIL_RETURN_DUR} var(--ease-snap)`;
+      el2.style.transition=`transform ${SWAP_FAIL_RETURN_DUR} var(--ease-snap)`;
+      el1.style.transform=''; el2.style.transform='';
+      await sleep(SWAP_FAIL_RETURN_WAIT);
+      [el1,el2].forEach(e=>{e.style.transition='';e.style.zIndex='';});
+      actions.push({t:Date.now(),type:'swap_fail',r1,c1,r2,c2});
+      onFailedSwap(r1,c1,r2,c2);
+      feelLog('실패복귀', (Date.now()-_feelSwapT0)+'ms 후 재입력 가능');
+      isAnimating=false;
+    }
+  }catch(e){
+    /* ── [SAFE GUARD] isAnimating 영구 잠금 방지 ──────────────────
+       DOM 조작 실패 / 메모리 압박 / WebView 이상 등 예외 발생 시
+       isAnimating=true 상태가 해제되지 않으면 게임이 영구 무반응이 된다.
+       board 데이터는 복원하지 않는다 — 일관성 복원보다 입력 복구가 우선.
+       유저는 로비로 나갔다가 다시 시작하면 보드가 초기화됨.
+    ────────────────────────────────────────────────────────────── */
+    console.error('[SAFE GUARD] trySwap error:', e);
+    isAnimating=false;
+    selected=null;
+    [el1,el2].forEach(el=>{
+      if(el){el.style.transition='';el.style.transform='';el.style.zIndex='';}
+    });
+  }finally{
+    /* finally: 어떤 경로에서도 isAnimating 잠금 보장.
+       정상 성공 경로: processMatches 체인 완료 후 trySwap try 블록 종료
+         → processMatches 내부에서 이미 false → 여기서 이중 해제(무해).
+       정상 실패 경로: 실패 분기 끝에서 이미 false → 이중 해제(무해).
+       예외 경로: catch에서 false → 이중 해제(무해).
+       모든 경로에서 isAnimating=false 보장. */
     isAnimating=false;
   }
 }
@@ -1407,14 +2226,14 @@ async function animateFall(fallInfo){
     const fi=fallInfo[r][c];
     if(!fi||fi.dist<=0)continue;
     const el=cellEls[r][c];
-    const dur=160+Math.min(fi.dist,6)*25;
-    el.style.transition=`transform ${dur}ms cubic-bezier(0.22,1,0.5,1),opacity 80ms ease`;
+    const dur=FALL_BASE_DUR+Math.min(fi.dist,6)*FALL_DIST_DUR;
+    el.style.transition=`transform ${dur}ms var(--ease-settle),opacity 80ms ease`;
     el.style.transform='';
     el.style.opacity='1';
   }
 
   // 4. 애니메이션 완료 대기
-  const waitMs=170+maxDist*28;
+  const waitMs=FALL_WAIT_BASE+maxDist*FALL_WAIT_DIST;
   await sleep(waitMs);
 
   // 5. 클린업
@@ -1430,17 +2249,24 @@ async function animateFall(fallInfo){
    메인 매치 처리 (async/await 시퀀싱)
 ════════════════════════════════════════════════ */
 async function processMatches(matches){
+  // chain_start: 첫 콤보(새 체인 시작)에서만 mark — 재귀 시 덮어쓰지 않음
+  if(combo===0) performance.mark('chain_start');
   combo++;
   if(combo>maxCombo)maxCombo=combo;
   clearTimeout(comboTimer);
+  // QA: lastRush 구간 콤보 추적
+  if(isLastRush) lrLog('콤보 성공', 'combo='+combo, 'window='+getComboWindow()+'ms', 'timeLeft='+timeLeft);
+  // Feel: 체인 단계별 소요 시간 추적
+  if(combo>1) feelLog('연쇄', combo+'단계', (Date.now()-_feelSwapT0)+'ms 경과');
 
   // 점수 (파트1 요구사항5 밸런스 유지)
   const mC=1+combo*COMBO_MULT, mF=isFever?FEVER_MULT:1, mA=adBoostOn?AD_MULT:1;
-  const mE=eventActive==='golden'?GOLDEN_MULT:eventActive==='rush'&&matches.some(m=>board[m.r][m.c].type===rushColor)?RUSH_MULT:1;
-  const mainPts=Math.floor(matches.length*BASE_SCORE*mC*mF*mA*mE);
+  const mainPts=Math.floor(matches.length*BASE_SCORE*mC*mF*mA);
   addScore(mainPts);
   showCombo(combo);
   if(combo>=5&&!isFever)startFever();
+  playMatchSfx(combo); // combo<2: match음
+  playComboSfx(combo); // combo≥2: combo 보상음 (match와 겹치지 않음)
 
   // 폭발 셀 결정 (즉시 발동형: 특수블록을 보드에 남기지 않고 바로 효과 적용)
   const exSet=new Set();
@@ -1480,7 +2306,7 @@ async function processMatches(matches){
   if(hasRainbow){addScore(Math.floor(RAINBOW_BONUS*mA));showToast(hasRainbow&&hasBomb?'🌈 전체 소탕!':'🌈 전체 소탕! +'+Math.floor(RAINBOW_BONUS*mA));}
 
   // 파트1-3 & 요구사항3: 스크린 쉐이크 (transform만 사용 → GPU 부하 최소)
-  if(hasBomb||hasRainbow||combo>=6)triggerShake();
+  if(hasBomb||hasRainbow){triggerShake();AudioSys.sfx.special();}
 
   const exCells=[...exSet].map(k=>{const[r,c]=k.split(',').map(Number);return{r,c};});
 
@@ -1500,7 +2326,7 @@ async function processMatches(matches){
     const mid=exCells[Math.floor(exCells.length/2)];
     const re=cellEls[mid.r][mid.c].getBoundingClientRect();
     const pr=document.getElementById('phone').getBoundingClientRect();
-    spawnScorePop(re.left-pr.left+re.width/2,re.top-pr.top,'+'+mainPts,mE>1?(eventActive==='golden'?'#FBBF24':'#A78BFA'):isFever?'#FBBF24':'#F1F5F9',combo>=4||isFever);
+    spawnScorePop(re.left-pr.left+re.width/2,re.top-pr.top,'+'+mainPts,isFever?'#FBBF24':'#F1F5F9',combo>=4||isFever,isLastRush);
   }
 
   // 파티클 (콤보 단계에 따라 증가)
@@ -1514,7 +2340,7 @@ async function processMatches(matches){
 
   // 폭발 클래스
   exCells.forEach(({r,c})=>cellEls[r][c].classList.add('exploding'));
-  await sleep(210);
+  await sleep(EXPLODE_WAIT); // CSS .18s + 5ms 버퍼
 
   // 데이터 업데이트 (즉시 발동형: 특수블록 배치 없이 전부 제거)
   exCells.forEach(({r,c})=>{board[r][c]={type:-1};});
@@ -1537,12 +2363,21 @@ async function processMatches(matches){
   // 콤보 체인 체크
   const next=findMatches();
   if(next.length>0){
-    await processMatches(next);
+    await processMatches(next); // 예외 시 trySwap catch로 버블링 → 안전망 작동
   }else{
-    comboTimer=setTimeout(()=>{combo=0;updateHUD();hideCombo();},850);
+    comboTimer=setTimeout(()=>{combo=0;updateHUD();hideCombo();}, getComboWindow());
     // 데드락 체크: 가능한 수가 없으면 자동 셔플
     if(!hasValidMove()){shuffleBoard();updateAll();showToast('🔀 셔플!');}
-    isAnimating=false;
+    // pre-selection 스테일 방지: 체인 중 보드가 바뀌었으므로 selected 클리어
+    if(selected){
+      const s=cellEls[selected.r]?.[selected.c];
+      if(s) s.classList.remove('selected');
+      selected=null;
+    }
+    feelLog('재입력가능', (Date.now()-_feelSwapT0)+'ms 경과', 'combo='+combo);
+    isAnimating=false; // 정상 완료 → trySwap finally에서 이중 해제(무해)
+    performance.mark('chain_end');
+    warnPerf('chain','chain_start','chain_end', 50); // 체인 전체 50ms 초과 시 경고
   }
 }
 
@@ -1626,7 +2461,7 @@ function shuffleBoard(){
     if(hasValidMove())break;
     for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
       board[r][c].type=randType();
-      if(board[r][c].overlay)board[r][c].overlay=board[r][c].overlay;
+      if(board[r][c].overlay){}// overlay 유지 (재할당 불필요)
     }
     for(let i=0;i<30;i++){
       const m=findMatches();
@@ -1642,21 +2477,27 @@ function shuffleBoard(){
 function addScore(pts){
   score+=pts;
   const el=document.getElementById('h-score');
-  el.textContent=score;
+  el.textContent=score.toLocaleString();
   el.classList.remove('bump','bump-high','bump-fever');void el.offsetWidth;
   el.classList.add(isFever?'bump-fever':combo>=4?'bump-high':'bump');
 }
 function updateHUD(){
-  document.getElementById('h-score').textContent=score;
+  document.getElementById('h-score').textContent=score.toLocaleString();
   document.getElementById('h-time').textContent=timeLeft;
   document.getElementById('h-plays').textContent=playsLeft;
   document.getElementById('h-combo').textContent=combo>=2?'×'+combo:'—';
+  // 타임바 너비 + 색 업데이트
+  const fill=document.getElementById('h-timebar-fill');
+  if(fill){
+    fill.style.width=(timeLeft/GAME_SEC*100)+'%';
+    fill.style.background=timeLeft<=5?'var(--red)':timeLeft<=LR_TRIGGER_SEC?'#FBBF24':'var(--d)';
+  }
 }
 function showCombo(n){
   if(n<2)return;
-  const msgs=['','','×2 DOUBLE!','×3 TRIPLE! 🔥','×4 QUAD!! 💥','×5 ⚡FEVER!','×6 🌟SUPER!'];
+  const msgs=['','','×2 COMBO','×3 TRIPLE','×4 QUAD','×5 FEVER','×6 CHAIN'];
   const strip=document.getElementById('combo-strip');
-  strip.textContent=msgs[Math.min(n,msgs.length-1)]||('×'+n+' MEGA!!');
+  strip.textContent=msgs[Math.min(n,msgs.length-1)]||('×'+n+' CHAIN');
   strip.className='combo-strip show'+(n>=5?' c5':n>=4?' c4':n>=3?' c3':'');
   // 피버 게이지
   const gauge=document.getElementById('fever-gauge');
@@ -1665,12 +2506,16 @@ function showCombo(n){
     gauge.className='fever-gauge show'+(n>=4?' warn':'');
     fill.style.width=Math.min(100,n*20)+'%';
   }else{gauge.className='fever-gauge';fill.style.width='0%';}
+  // Anticipation: combo 4 = 게이지 80% = 피버 1콤보 전
+  if(n===ANTCP_COMBO&&!isFever) enterNearFever();
+  else exitNearFever(false);
   updateHUD();
 }
 function hideCombo(){
   document.getElementById('combo-strip').className='combo-strip';
   document.getElementById('fever-gauge').className='fever-gauge';
   document.getElementById('fever-gauge-fill').style.width='0%';
+  exitNearFever(false); // 콤보 끊김 → anticipation 해제
 }
 
 function triggerShake(){
@@ -1680,7 +2525,10 @@ function triggerShake(){
 }
 
 function startFever(){
+  exitNearFever(true); // 피버 진입 성공 → anticipation 즉시 해제
   isFever=true;feverLeft=12;
+  AudioSys.sfx.feverIn();   // 피버 팡파르
+  AudioSys.setFever(true);  // fever 레이어 fade in
   document.getElementById('s-play').classList.add('fever-mode');
   const b=document.getElementById('fever-banner');b.classList.add('on');
   document.getElementById('fever-t').textContent=12;
@@ -1695,8 +2543,80 @@ function startFever(){
     feverLeft--;document.getElementById('fever-t').textContent=feverLeft;
     if(feverLeft<=0){isFever=false;clearInterval(feverTmr);
       document.getElementById('s-play').classList.remove('fever-mode');
-      b.classList.remove('on');}
+      b.classList.remove('on');
+      AudioSys.setFever(false); // fever 레이어 fade out
+    }
   },1000);
+}
+
+/* ════════════════════════════════════════════════
+   Last Rush 상태 진입 / 해제
+   ─────────────────────────────────────────────
+   enterLastRush : timeLeft===LR_TRIGGER_SEC 에서 1회만 호출.
+   exitLastRushVisual : 5초 이하 전환 시 시각 해제 (isLastRush는 유지).
+   clearLastRushVisual : 게임 종료/연장 시 모든 클래스 제거.
+════════════════════════════════════════════════ */
+function enterLastRush(){
+  isLastRush=true;
+  scoreAtRushStart=score;
+  const te=document.getElementById('h-time');
+  const uf=document.getElementById('uf');
+  document.getElementById('s-play').classList.add('last-rush-mode');
+  te.classList.add('last-rush');
+  uf.classList.add('last-rush');
+  // 보조 오브젝트 1개 조용히 추가 스폰 (랜덤 딜레이, 1회만)
+  if(!lastRushTriggered){
+    lastRushTriggered=true;
+    setTimeout(()=>{
+      if(timeLeft>3){
+        spawnOverlay();
+        // 방금 스폰된 셀을 찾아 짧은 hint 연출 (위치 노출 아님 — 스폰 자체가 이미 보임)
+        // 가장 최근에 overlay가 생긴 셀 1개에만 적용
+        let hintEl=null;
+        outer: for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+          if(board[r][c].overlay){ hintEl=cellEls[r][c]; }
+        }
+        if(hintEl){
+          hintEl.classList.add('lr-hint');
+          setTimeout(()=>hintEl.classList.remove('lr-hint'), 380);
+        }
+        AudioSys.sfx.lastRushHint(); // micro SFX 1회
+      }
+    }, LR_OV_DELAY_MIN+Math.random()*LR_OV_DELAY_RNG);
+  }
+  lrLog('진입', 'timeLeft='+timeLeft, 'score='+scoreAtRushStart,
+        'comboWindow='+getComboWindow()+'ms');
+  AudioSys.setRush(true); // rush 레이어 fade in
+  // Last Rush 체감 강화: master gain 10% 상승 (CSS 타이밍 미영향)
+  if(AudioSys._ctx&&AudioSys._master){
+    const cur=AudioSys._master.gain.value;
+    AudioSys._master.gain.linearRampToValueAtTime(
+      Math.min(cur*1.10, 0.72), AudioSys._ctx.currentTime+0.30
+    );
+  }
+}
+function exitLastRushVisual(){
+  // 5초 이하: last-rush amber → urgent red 로 전환. isLastRush 값은 유지.
+  // last-rush 클래스가 없으면 이미 전환됐거나 비해당 → early return
+  const te=document.getElementById('h-time');
+  if(!te.classList.contains('last-rush')) return;
+  const uf=document.getElementById('uf');
+  te.classList.remove('last-rush'); te.classList.add('urgent');
+  uf.classList.remove('last-rush'); uf.classList.add('on');
+  document.getElementById('s-play').classList.remove('last-rush-mode');
+}
+function clearLastRushVisual(){
+  // 게임 종료·연장 팝업 시 모든 lastRush/urgent 클래스 정리
+  // ── [F] 1초 전 soft-focus 의도적 미구현 ──────────────
+  // 사유: timeLeft===1 구간은 터치 입력이 가장 집중되는 순간.
+  // board-wrap에 blur(0.3px)를 주면 모바일 터치 정밀도를 방해하고
+  // GPU 합성 비용도 추가된다. 기존 urgent red 테두리로 충분.
+  // ──────────────────────────────────────────────────────
+  const te=document.getElementById('h-time');
+  const uf=document.getElementById('uf');
+  te.classList.remove('last-rush','urgent');
+  uf.classList.remove('last-rush','on');
+  document.getElementById('s-play').classList.remove('last-rush-mode');
 }
 
 /* ════════════════════════════════════════════════
@@ -1705,22 +2625,46 @@ function startFever(){
 function startTimer(){
   clearInterval(gameTimer);
   gameTimer=setInterval(()=>{
-    if(isAnimating)return; // 연쇄 폭발 중에는 시간 멈춤
+    // 10초 이하(lastRush 구간)일 때만 애니메이션 중 시간 정지
+    // 그 외 구간은 콤보 중에도 시간이 흐름
+    if(isAnimating && timeLeft<=LR_TRIGGER_SEC) return;
     timeLeft--;
     const te=document.getElementById('h-time');
     te.textContent=timeLeft;
-    const uf=document.getElementById('uf');
-    if(timeLeft<=5&&timeLeft>0){te.classList.add('urgent');uf.classList.add('on');}
-    else{te.classList.remove('urgent');uf.classList.remove('on');}
-    if(timeLeft<=0){clearInterval(gameTimer);if(usedDiamond&&usedAd){forceEnd();}else{updateExtPopup();document.getElementById('ext-overlay').classList.add('on');}}
+    // Toss 스타일 타임 틱 (urgent/last-rush 아닐 때만)
+    if(!te.classList.contains('urgent')&&!te.classList.contains('last-rush')){
+      te.classList.remove('tick');void te.offsetWidth;te.classList.add('tick');
+    }
+    updateHUD();
+
+    // Last Rush 진입 — LR_TRIGGER_SEC 초에 정확히 1회
+    if(timeLeft===LR_TRIGGER_SEC && !isLastRush) enterLastRush();
+
+    // 5초 이하 — urgent 전환
+    if(timeLeft<=5 && timeLeft>0) exitLastRushVisual();
+
+    // 종료
+    if(timeLeft<=0){
+      clearInterval(gameTimer);
+      clearLastRushVisual();
+      if(usedDiamond&&usedAd){forceEnd();}
+      else{updateExtPopup();document.getElementById('ext-overlay').classList.add('on');}
+    }
   },1000);
 }
 function updateExtPopup(){
   const el=document.getElementById('ext-reward');
   const estAdd=Math.max(50,Math.floor(score*0.3));
-  el.innerHTML=`<div class="popup-reward-row"><span>현재 점수</span><span class="popup-reward-val">${score.toLocaleString()}점</span></div>`
-    +`<div class="popup-reward-row"><span>연장 시 예상</span><span class="popup-reward-val">~${(score+estAdd).toLocaleString()}점</span></div>`
-    +`<div class="popup-reward-row"><span>🌾 재배 단축</span><span class="popup-reward-val green">-30분 (고정)</span></div>`;
+  el.innerHTML=
+    `<div class="popup-reward-row">
+       <span class="popup-reward-lbl">현재 점수</span>
+       <span class="popup-reward-val">${score.toLocaleString()}<span style="font-size:11px;color:rgba(255,255,255,0.35);font-family:'Noto Sans KR',sans-serif;font-weight:700;margin-left:3px">점</span></span>
+     </div>
+     <div class="popup-reward-divider"></div>
+     <div class="popup-reward-row">
+       <span class="popup-reward-lbl">연장 시 예상</span>
+       <span class="popup-reward-val est">~${(score+estAdd).toLocaleString()}<span style="font-size:12px;color:rgba(251,191,36,0.5);font-family:'Noto Sans KR',sans-serif;font-weight:700;margin-left:3px">점</span></span>
+     </div>`;
   // 버튼 1회 사용 후 비활성화
   const bd=document.getElementById('btn-diamond');
   const ba=document.getElementById('btn-ad');
@@ -1739,6 +2683,14 @@ function doExtend(sec){
   document.getElementById('h-time').classList.remove('urgent');
   timeLeft=sec;
   updateHUD();
+  // 연장 시에도 isLastRush가 true면 last-rush 시각 복원
+  // (다이아 10초 연장 = 다시 LR 구간이므로 amber 유지가 자연스러움)
+  if(isLastRush){
+    document.getElementById('h-time').classList.add('last-rush');
+    document.getElementById('uf').classList.add('last-rush');
+    document.getElementById('s-play').classList.add('last-rush-mode');
+    lrLog('연장 후 last-rush 시각 복원', 'timeLeft='+sec);
+  }
   isAnimating=true; // ★ 카운트다운 중 블록 조작 차단
   const cd=document.getElementById('countdown');
   const num=document.getElementById('cd-num');
@@ -1759,6 +2711,7 @@ function doExtend(sec){
   function showNum(n){
     num.textContent=n;
     num.className='cd-num pop';
+    AudioSys.sfx.countTick(n);   // 틱 효과음
   }
   // 숫자 퇴장 → 다음 숫자 등장
   function nextStep(){
@@ -1772,13 +2725,61 @@ function doExtend(sec){
         // GO! 표시
         num.textContent='GO!';
         num.className='cd-num pop';
+        AudioSys.sfx.countGo();  // GO 효과음
         setTimeout(()=>{
           num.className='cd-num out';
           setTimeout(()=>{
             cd.classList.remove('on');
             dots.innerHTML='';
             isAnimating=false; // ★ 조작 차단 해제
+            AudioSys.init();   // 연장 후 AudioContext 재개 보장
             startTimer();
+          },250);
+        },500);
+      }
+    },250);
+  }
+  showNum(count);
+  setTimeout(nextStep,600);
+}
+
+/* showReadyGo: "한 판 더" 재시작 시 READY → 3·2·1·GO! 카운트다운.
+   doExtend의 카운트다운 구조를 재사용. 완료 후 startTimer 호출. */
+function showReadyGo(){
+  const cd  = document.getElementById('countdown');
+  const num = document.getElementById('cd-num');
+  const lbl = cd.querySelector('.cd-label');
+  const dots= document.getElementById('cd-dots');
+  dots.innerHTML='';
+  for(let i=0;i<12;i++){
+    const d=document.createElement('div');d.className='cd-dot';
+    d.style.left=Math.random()*100+'%';
+    d.style.top=40+Math.random()*40+'%';
+    d.style.animationDelay=Math.random()*2+'s';
+    d.style.animationDuration=(1.5+Math.random())+'s';
+    dots.appendChild(d);
+  }
+  if(lbl) lbl.textContent='READY';
+  isAnimating=true; // 카운트다운 중 입력 차단
+  cd.classList.add('on');
+  let count=3;
+  function showNum(n){ num.textContent=n; num.className='cd-num pop'; AudioSys.sfx.countTick(n); }
+  function nextStep(){
+    num.className='cd-num out';
+    setTimeout(()=>{
+      count--;
+      if(count>0){ showNum(count); setTimeout(nextStep,600); }
+      else{
+        num.textContent='GO!'; num.className='cd-num pop';
+        AudioSys.sfx.countGo();
+        setTimeout(()=>{
+          num.className='cd-num out';
+          setTimeout(()=>{
+            cd.classList.remove('on');
+            dots.innerHTML='';
+            if(lbl) lbl.textContent='READY';
+            isAnimating=false;
+            startTimer(); startOverlaySpawn(); AudioSys.startBGM(); startGameSession();
           },250);
         },500);
       }
@@ -1800,16 +2801,47 @@ function extendAd(){
   // 실제로는 여기서 광고 SDK 호출 → 콜백에서 doExtend
   doExtend(15);
 }
-function forceEnd(){
-  clearInterval(gameTimer);clearInterval(feverTmr);stopOverlaySpawn();clearEventTimers();
+/* ── 포기 확인 팝업 ──────────────────────────────
+   열릴 때: 타이머 일시정지 + 보드 블러(블록 위치 숨김)
+   취소 시: 타이머 재개 + 블러 해제
+   확인 시: forceEnd() 호출
+──────────────────────────────────────────────── */
+function showQuitConfirm(){
+  if(timeLeft<=0)return; // 이미 종료된 판은 무시
+  // 타이머 일시정지
+  clearInterval(gameTimer);
+  // 보드 블러 — 블록 위치 숨김
+  document.querySelector('.board-wrap').classList.add('blurred');
+  // 팝업 표시
+  document.getElementById('quit-overlay').classList.add('on');
+}
+function cancelQuit(){
+  // 팝업 닫기
+  document.getElementById('quit-overlay').classList.remove('on');
+  // 보드 블러 해제
+  document.querySelector('.board-wrap').classList.remove('blurred');
+  // 타이머 재개
+  startTimer();
+}
+function confirmQuit(){
+  document.getElementById('quit-overlay').classList.remove('on');
+  document.querySelector('.board-wrap').classList.remove('blurred');
+  forceEnd();
+}
+
+async function forceEnd(){
+  AudioSys.stopBGM();
+  AudioSys.sfx.gameOver();  // 게임오버 효과음
+  clearInterval(gameTimer);clearInterval(feverTmr);stopOverlaySpawn();
   document.getElementById('ext-overlay').classList.remove('on');
-  // 게임 종료 연출 → 결과 화면
+  // P2E: 즉시 제출 시작 — 게임오버 연출(800ms)과 병렬. showResult는 캐시 사용.
+  submitGameResult().then(sr=>{ _serverResult=sr; }).catch(()=>{});
   const go=document.getElementById('gameover');
   go.classList.add('on');
   setTimeout(()=>{
     go.classList.remove('on');
-    showResult();
-  },1400);
+    showResult(_serverResult); // 800ms 내 응답 오면 서버값, 아니면 null
+  }, 800); // 게임오버 연출 → 결과창 전환 800ms 고정
 }
 
 /* ════════════════════════════════════════════════
@@ -1827,12 +2859,14 @@ function spawnParticle(x,y,big){
 
 /* ════════════════════════════════════════════════
    플로팅 스코어 팝업
+   lr=true: lastRush 구간 — 숫자 체공 시간 소폭 연장(가독성 향상)
 ════════════════════════════════════════════════ */
-function spawnScorePop(x,y,text,color,big){
-  const p=document.createElement('div');p.className='score-pop'+(big?' big':'');
+function spawnScorePop(x,y,text,color,big,lr){
+  const cls='score-pop'+(big?' big':'')+(lr?' lr':'')+(isNearFever?' nf':'');
+  const p=document.createElement('div');p.className=cls;
   p.textContent=text;p.style.cssText=`left:${x}px;top:${y}px;color:${color};`;
   document.getElementById('phone').appendChild(p);
-  setTimeout(()=>p.remove(),580);
+  setTimeout(()=>p.remove(),lr?700:580);
 }
 
 /* ════════════════════════════════════════════════
@@ -1869,54 +2903,6 @@ function startOverlaySpawn(){
 }
 function stopOverlaySpawn(){clearTimeout(overlayTmr);overlayTmr=null;}
 
-/* ════════════════════════════════════════════════
-   랜덤 이벤트
-════════════════════════════════════════════════ */
-function triggerEvent(type){
-  if(timeLeft<=3||eventActive)return;
-  eventActive=type;
-  const banner=document.getElementById('event-banner');
-  const title=document.getElementById('event-title');
-  const sub=document.getElementById('event-sub');
-  banner.className='event-banner '+type;
-  const dur=type==='golden'?GOLDEN_DUR:RUSH_DUR;
-  let left=dur;
-  if(type==='golden'){
-    title.textContent='⚡ GOLDEN TIME ×'+GOLDEN_MULT;
-    document.getElementById('s-play').classList.add('golden-mode');
-  }else{
-    rushColor=Math.floor(Math.random()*5);
-    title.textContent=COLOR_NAMES[rushColor]+' RUSH ×'+RUSH_MULT;
-    document.getElementById('s-play').classList.add('rush-mode');
-    updateAll();
-  }
-  sub.textContent=left+'초';
-  banner.classList.add('on');
-  const iv=setInterval(()=>{left--;sub.textContent=left+'초';if(left<=0)clearInterval(iv);},1000);
-  eventTmrs.push(iv);
-  eventTmrs.push(setTimeout(()=>endEvent(),dur*1000));
-}
-function endEvent(){
-  const prev=eventActive;
-  eventActive=null;rushColor=-1;
-  document.getElementById('event-banner').classList.remove('on');
-  document.getElementById('s-play').classList.remove('golden-mode','rush-mode');
-  if(prev==='rush')updateAll();
-}
-function scheduleEvents(){
-  clearEventTimers();
-  const first=Math.random()<0.5?'golden':'rush';
-  eventTmrs.push(setTimeout(()=>triggerEvent(first),15000+Math.random()*7000));
-  if(Math.random()<0.5){
-    const second=first==='golden'?'rush':'golden';
-    eventTmrs.push(setTimeout(()=>triggerEvent(second),35000+Math.random()*10000));
-  }
-}
-function clearEventTimers(){
-  eventTmrs.forEach(t=>{clearTimeout(t);clearInterval(t);});
-  eventTmrs=[];
-  if(eventActive)endEvent();
-}
 
 /* ════════════════════════════════════════════════
    온보딩 (첫 판만)
@@ -1929,7 +2915,8 @@ function showOnboard(){
     if(done)return;done=true;
     el.classList.remove('on');
     hasPlayed=true;
-    startTimer();startOverlaySpawn();scheduleEvents();
+    startTimer();startOverlaySpawn();AudioSys.startBGM();
+    startGameSession(); // P2E: 세션 발급 (비동기, 게임 진행과 병렬)
   };
   el.addEventListener('pointerdown',go,{once:true});
   setTimeout(go,3500);
@@ -1968,56 +2955,162 @@ function calcGuildPts(raw){
 /* ════════════════════════════════════════════════
    결과 화면
 ════════════════════════════════════════════════ */
-function showResult(){
+
+/* buildHighlights: 이번 판에서 가장 의미 있는 항목 2~3개 선택.
+   "기록"이 아닌 "기억"으로 읽히도록 우선순위 설계.
+   ─────────────────────────────────────────────
+   우선순위:
+   1. 피버 달성 (mc>=5) — 최고 감정 가치
+   2. 최대 콤보
+      - 피버 달성 시: mc>=7 이상만 별도 표시 (피버가 ×5 이상을 대표)
+      - 피버 미달성: mc>=2 이상이면 표시 (임계값 낮춤 → fallback 발동 최소화)
+   3. 라스트 10초 비중 (>=12%)
+   4. 오브젝트 획득 (>=2개)
+   fallback: mc<2 판에서만 발동. "×0/×1 COMBO" 대신 방향 제시 1개. */
+function buildHighlights(sc, mc, lr, lrStart, ovStat){
+  const items=[];
+  const ovTotal=ovStat.gold+ovStat.clock+ovStat.star;
+
+  // 1. 피버 달성 — 최고 임팩트
+  if(mc>=5) items.push({lbl:'🔥 피버까지 갔다', val:'FEVER', cls:'gold', rank:1});
+
+  // 2. 최대 콤보 — 감정형 라벨
+  if(mc>=5){
+    if(mc>=7) items.push({lbl:'연쇄의 신', val:'×'+mc, cls:'gold', rank:2});
+  }else if(mc>=4){
+    items.push({lbl:'피버 한 끗 차이', val:'×'+mc, cls:'purple', rank:3});
+  }else if(mc>=2){
+    items.push({lbl:'연속 매치', val:'×'+mc, cls:'', rank:4});
+  }
+
+  // 3. 후반 역전 — Last Rush 비중
+  if(lr && sc>0){
+    const rushPts=sc-lrStart;
+    const rushPct=Math.round(rushPts/sc*100);
+    if(rushPct>=25) items.push({lbl:'막판 역전 폭발', val:rushPct+'%', cls:'gold', rank:2});
+    else if(rushPct>=12) items.push({lbl:'후반 집중', val:rushPct+'%', cls:'purple', rank:3});
+  }
+
+  // 4. 보너스 획득
+  if(ovTotal>=2) items.push({lbl:'보너스 수집', val:ovTotal+'개', cls:'green', rank:4});
+
+  // fallback
+  if(items.length===0){
+    items.push({lbl:'다음 목표', val:'×3 연쇄', cls:'', rank:5});
+  }
+
+  // rank 기준 정렬 후 최대 3개
+  items.sort((a,b)=>a.rank-b.rank);
+  const top3=items.slice(0,3);
+
+  // 1위만 gold, 나머지는 cls 강등
+  top3.forEach((it,i)=>{
+    if(i>0 && it.cls==='gold') it.cls='purple'; // 2,3위 gold→purple
+  });
+
+  return top3;
+}
+
+/* buildTrigger: "거의 됐음" 감정 트리거 조건 판단.
+   노골적 재도전 유도 금지 — 관찰 어투로만 표현. */
+function buildTrigger(sc, mc, lr, lrStart){
+  if(mc===4) return '피버 한 번만 더 이었으면...';
+  if(mc===3) return '연속 매치가 끊겼다. 아깝다.';
+  if(lr && sc>0){
+    const pct=Math.round((sc-lrStart)/sc*100);
+    if(pct>=30) return '막판 10초에 폭발했다. 이 흐름 기억해';
+    if(pct>=20) return '막판에 살아났다. 처음부터 이 집중력이면?';
+  }
+  if(mc>=6) return '이 콤보 흐름, 다음 판에도 나온다';
+  if(mc>=5) return '피버까지 갔다. 한 판 더';
+  return '';
+}
+
+function showResult(serverResult){
+  AudioSys.sfx.resultIn();  // 결과창 등장 효과음
+  /* ── 서버 응답 파싱 ────────────────────────────────────────────
+     VALID  : 서버 검증 완료 → sr 값이 진실원
+     OFFLINE: 서버 미연동  → 로컬 예측치 표시 + "검증 대기" 표기
+     ERROR  : 제출 실패    → 로컬 예측치 표시 + "검증 대기" 표기
+  ─────────────────────────────────────────────────────────────── */
+  const sr      = serverResult || {status:'OFFLINE'};
+  const isValid = sr.status === 'VALID';
+  // finalScore — VALID면 서버 확정값, 아니면 로컬 예측치(미검증)
+  const finalScore = isValid ? sr.finalScore : score;
+  // guildPts / farmReduceSec — VALID면 서버값, 아니면 null (UI에서 '—')
+  const guildPts      = isValid ? sr.guildPts      : null;
+  const farmReduceSec = isValid ? sr.farmReduceSec : null;
+  const farmMin       = farmReduceSec !== null ? Math.round(farmReduceSec/60) : null;
+
   showScreen('result');
-  // 슬라이드업 모션
   const ri=document.querySelector('.result-inner');
   ri.classList.remove('show');
   requestAnimationFrame(()=>requestAnimationFrame(()=>ri.classList.add('show')));
+
+  // 기본 점수 표시 (광고 배율 역산)
   const base=adBoostOn?Math.round(score/AD_MULT):score;
   document.getElementById('r-base').textContent=`${base.toLocaleString()}점 (기본)`;
   document.getElementById('r-plays').textContent=playsLeft;
   const buff=document.getElementById('r-buff');
   adBoostOn?buff.classList.add('show'):buff.classList.remove('show');
-  // 가속형 카운트업
+
+  // finalScore 미검증 상태 표시
+  const scoreCard=document.getElementById('result-score-card');
+  const unverifiedLabel=document.getElementById('r-unverified-label');
+  if(!isValid){
+    scoreCard.classList.add('unverified');
+    unverifiedLabel.style.display='';  // "⚠ 미검증 점수 — 서버 확인 전" 노출
+  }else{
+    scoreCard.classList.remove('unverified');
+    unverifiedLabel.style.display='none';
+  }
+
+  // 최종 점수 카운트업 → serverResult.finalScore 기준
   const finalEl=document.getElementById('r-final');
-  if(score>0){
+  if(finalScore>0){
     let cur=0,spd=1;
     const ctr=setInterval(()=>{
-      spd=Math.ceil(spd*1.08)+1;
-      cur=Math.min(cur+spd,score);
+      spd=Math.ceil(spd*1.08)+1;cur=Math.min(cur+spd,finalScore);
       finalEl.textContent=cur.toLocaleString();
-      if(cur>=score){clearInterval(ctr);finalEl.style.animation='none';void finalEl.offsetWidth;finalEl.style.animation='countReveal .4s ease';}
+      if(cur>=finalScore){
+        clearInterval(ctr);
+        finalEl.style.animation='none';void finalEl.offsetWidth;
+        finalEl.style.animation='countReveal .4s ease';
+      }
     },18);
   }else{finalEl.textContent='0';}
-  // 이번 판 하이라이트
-  let hl='';
-  hl+=`<div class="hl-row"><span>🎯 최대 콤보</span><span class="hl-val ${maxCombo>=5?'gold':maxCombo>=3?'purple':''}">×${maxCombo}</span></div>`;
-  if(maxCombo>=5)hl+=`<div class="hl-row"><span>🔥 피버 달성</span><span class="hl-val gold">YES</span></div>`;
-  const ovTotal=overlayStats.gold+overlayStats.clock+overlayStats.star;
-  if(ovTotal>0)hl+=`<div class="hl-row"><span>💎 보너스 오브젝트</span><span class="hl-val green">${ovTotal}개 획득</span></div>`;
-  document.getElementById('hl-stats').innerHTML=hl;
-  // 길드 기여 (로그 감쇠)
-  setTimeout(()=>{
-    const guildPts=calcGuildPts(score);
-    const tierLbl=guildPts>=250?'🏆 MVP 기여':guildPts>=160?'🔥 핵심 기여자':guildPts>=75?'⚡ 활발 기여':'🌱 성장 중';
-    document.getElementById('r-guild-pts').textContent=`+${guildPts}pt`;
-    document.getElementById('r-guild-tier').textContent=tierLbl;
-  },600);
-  // 농장 시간 단축 보상
-  const farmMin=30; // 고정 30분 (하루 3회)
-  let fh=`<div class="farm-row"><span class="farm-ico">🥔</span><span>감자 재배 시간</span><span class="farm-val">-${farmMin}분</span></div>`;
-  document.getElementById('farm-stats').innerHTML=fh;
-  // 오브젝트 통계
-  const oc=document.getElementById('ov-card');
-  if(ovTotal>0){
-    oc.style.display='';
-    let oh='';
-    if(overlayStats.gold)oh+=`<div>💰 황금감자 ×${overlayStats.gold} → <span style="color:var(--g)">+${overlayStats.gold*GOLD_BONUS}점</span></div>`;
-    if(overlayStats.clock)oh+=`<div>⏰ 시계감자 ×${overlayStats.clock} → <span style="color:var(--green)">+${overlayStats.clock*CLOCK_BONUS}초</span></div>`;
-    if(overlayStats.star)oh+=`<div>⭐ 별감자 ×${overlayStats.star} → <span style="color:var(--purple)">콤보 +${overlayStats.star*STAR_COMBO}</span></div>`;
-    document.getElementById('ov-stats').innerHTML=oh;
-  }else{oc.style.display='none';}
+
+  // 하이라이트
+  const hlItems=buildHighlights(score,maxCombo,isLastRush,scoreAtRushStart,overlayStats);
+  const hlHtml=hlItems.map(it=>
+    `<div class="hl-row"><span>${it.lbl}</span><span class="hl-val${it.cls?' '+it.cls:''}">${it.val}</span></div>`
+  ).join('');
+  document.getElementById('hl-stats').innerHTML=hlHtml;
+
+  // 감정 트리거
+  const trigger=buildTrigger(score,maxCombo,isLastRush,scoreAtRushStart);
+  const trigEl=document.getElementById('hl-trigger');
+  trigEl.textContent=trigger;
+  trigEl.style.display=trigger?'':'none';
+
+  // 길드 기여 — 서버 VALID면 실제값, 아니면 "검증 대기"
+  const guildEl = document.getElementById('r-guild-pts');
+  const tierEl  = document.getElementById('r-guild-tier');
+  if(isValid){
+    const tierLbl = guildPts>=250?'MVP 기여':guildPts>=160?'핵심 기여자':guildPts>=75?'활발 기여':'성장 중';
+    guildEl.textContent = `+${guildPts}pt`;
+    tierEl.textContent  = tierLbl;
+  }else{
+    guildEl.textContent = '검증 대기';
+    tierEl.textContent  = sr.status==='ERROR' ? '서버 오류' : '서버 미연동';
+    guildEl.style.color = 'rgba(255,255,255,0.35)';
+  }
+
+  // 농장 단축 — 서버 VALID면 실제값, 아니면 미확정
+  const farmEl = document.querySelector('.result-meta-val.green');
+  if(farmEl){
+    farmEl.textContent = isValid && farmMin !== null ? `-${farmMin}분` : '—';
+  }
 }
 
 /* ════════════════════════════════════════════════
@@ -2027,6 +3120,16 @@ function startGame(){
   playsLeft--;
   score=0;timeLeft=GAME_SEC;combo=0;maxCombo=0;overlayStats={gold:0,clock:0,star:0};usedDiamond=false;usedAd=false;
   isFever=false;isAnimating=false;selected=null;
+  isLastRush=false;lastRushTriggered=false;scoreAtRushStart=0;
+  nmLastTime=0; nmStats={fail:0,detect:0,fire:0,cooldown:0,skip:0};
+  isNearFever=false; nearFeverEntry=0;
+  actions=[]; gameSession=null; _serverResult=null; // P2E 리셋
+  // Feel / 스와이프 상태 리셋
+  swipeOriginR=-1; swipeOriginC=-1; swipeFired=false; _feelSwapT0=0; _activePointerId=-1;
+  lrLog('초기화 완료 — isLastRush='+isLastRush+', lastRushTriggered='+lastRushTriggered);
+  nmLog('초기화 완료');
+  antcpLog('초기화 완료');
+  feelLog('초기화 완료');
   clearInterval(gameTimer);clearInterval(feverTmr);clearTimeout(comboTimer);
   showScreen('play');
   initBoard();
@@ -2034,21 +3137,26 @@ function startGame(){
   if(!cellEls.length||!cellEls[0])initBoardDOM();
   updateAll();
   updateHUD();
-  document.getElementById('s-play').classList.remove('fever-mode');
+  document.getElementById('s-play').classList.remove('fever-mode','last-rush-mode');
   document.getElementById('fever-banner').classList.remove('on');
   document.getElementById('combo-strip').className='combo-strip';
   document.getElementById('fever-gauge').className='fever-gauge';
   document.getElementById('fever-flash').classList.remove('on');
-  document.getElementById('uf').classList.remove('on');
+  document.getElementById('uf').classList.remove('on','last-rush');
+  document.getElementById('h-time').classList.remove('urgent','last-rush','tick');
+  // 타임바 초기화
+  const fill=document.getElementById('h-timebar-fill');
+  if(fill){fill.style.width='100%';fill.style.background='var(--d)';}
   // 셀 높이 실측
   requestAnimationFrame(()=>{
     if(cellEls[0]&&cellEls[0][0])CELL_H=cellEls[0][0].getBoundingClientRect().height||48;
     if(!hasPlayed){showOnboard();}
-    else{startTimer();startOverlaySpawn();scheduleEvents();}
+    else{showReadyGo();} // 한 판 더: READY~GO 카운트다운 후 시작
   });
 }
 
 function goLobby(){
+  AudioSys.stopBGM();
   document.getElementById('lby-plays').textContent=playsLeft;
   document.getElementById('s-play').classList.remove('fever-mode');
   showScreen('lobby');
@@ -2070,10 +3178,421 @@ function showScreen(name){
   document.getElementById('s-'+name).classList.add('active');
 }
 
+/* ════════════════════════════════════════════════
+   오디오 시스템 (Web Audio API 완전 합성)
+   외부 파일 없음 — oscillator 기반 BGM + SFX.
+   레이어 구조: base(항상) / fever(피버 시 fade in) / rush(lastRush 시 fade in)
+════════════════════════════════════════════════ */
+const AudioSys=(()=>{
+  let _ctx=null,_master=null,_bGain=null,_fGain=null,_rGain=null;
+  let _seqTmr=null,_nextTime=0,_step=0,_muted=false;
+
+  // BPM 기본 120 / 피버 전용 BPM 168 (긴박감)
+  const S8    = 60/120/2;          // 베이스 8분음표
+  const SF8   = 60/168/2;          // 피버 8분음표 (더 빠름)
+  const SF16  = SF8/2;             // 피버 16분음표
+
+  // 음표 주파수 (Hz)
+  const F={
+    C3:130.81,D3:146.83,E3:164.81,F3:174.61,G3:196.00,A3:220.00,B3:246.94,
+    C4:261.63,D4:293.66,E4:329.63,F4:349.23,G4:392.00,A4:440.00,B4:493.88,
+    C5:523.25,D5:587.33,E5:659.25,F5:698.46,G5:784.00,A5:880.00,B5:987.77,
+    C6:1046.50
+  };
+
+  /* ── 베이스 BGM 시퀀스 (BPM120, 캐주얼) ── */
+  const SEQ_BASE=[
+    F.C4,0,    F.E4,0,    F.G4,F.E4,F.C4,0,
+    F.A4,0,    F.G4,0,    F.E4,F.G4,F.A4,F.G4
+  ];
+
+  /* ── 피버 멜로디 (BPM168, 32step = 싱코페이션 포함 긴박 루프) ──
+     구성: 킥펄스(저음) + 싱코페이션 멜로디 + 16분 마무리
+     F장조 상승 루프 — 달리는 느낌, 끝에서 한 옥타브 점프 */
+  const SEQ_FEVER_MELODY=[
+    F.F4, F.A4, F.C5, F.F5,
+    F.E5, 0,    F.D5, F.C5,
+    F.D5, F.F5, F.E5, F.D5,
+    F.C5, F.A4, F.C5, F.E5,
+    F.F5, F.E5, F.D5, F.C5,
+    F.D5, F.E5, F.F5, 0,
+    F.C6, F.A5, F.G5, F.F5,
+    F.G5, F.F5, F.E5, F.D5
+  ];
+
+  /* 킥 저음 (16분 그루브) — 저역에서 펄스 느낌 */
+  const SEQ_FEVER_KICK=[
+    F.F3, 0,    F.F3, 0,    F.F3, F.F3, 0,    0,
+    F.F3, 0,    F.C3, 0,    F.F3, 0,    F.F3, F.C3,
+    F.F3, 0,    F.F3, 0,    F.F3, F.F3, 0,    F.C3,
+    F.F3, 0,    F.F3, F.C3, F.F3, 0,    F.A3, 0
+  ];
+
+  /* Rush (LastRush) 저음 펄스 — 긴박 강조 */
+  const SEQ_RUSH=[
+    F.C3,F.C3,F.G3,F.C3,F.A3,F.G3,F.C3,F.A3,
+    F.C3,0,   F.G3,0,   F.E3,F.G3,F.C3,0
+  ];
+
+  // 피버 전용 스텝 카운터 (베이스와 독립)
+  let _fStep=0, _fNextTime=0, _fTmr=null;
+
+  // ── 내부 유틸 ──────────────────────────────────
+  function _ensure(){
+    if(!_ctx){
+      _ctx=new(window.AudioContext||window.webkitAudioContext)();
+      _master=_ctx.createGain();_master.gain.value=_muted?0:0.52;_master.connect(_ctx.destination);
+      _bGain=_ctx.createGain();_bGain.gain.value=0;_bGain.connect(_master);
+      _fGain=_ctx.createGain();_fGain.gain.value=0;_fGain.connect(_master);
+      _rGain=_ctx.createGain();_rGain.gain.value=0;_rGain.connect(_master);
+    }
+    if(_ctx.state==='suspended')_ctx.resume();
+  }
+
+  /* 단발 음표 — 자연스러운 어택/디케이 엔벨로프 */
+  function _note(freq,dest,vol,when,dur,type='sine'){
+    if(!freq||!_ctx)return;
+    const osc=_ctx.createOscillator(),g=_ctx.createGain();
+    osc.type=type;osc.frequency.value=freq;
+    osc.connect(g);g.connect(dest);
+    g.gain.setValueAtTime(0,when);
+    g.gain.linearRampToValueAtTime(vol,when+0.004);
+    g.gain.exponentialRampToValueAtTime(0.001,when+dur);
+    osc.start(when);osc.stop(when+dur+0.02);
+  }
+
+  /* 마림바/차임 질감 — 기본 + 배음(2,3배음) 레이어링 */
+  function _chime(freq,dest,vol,when,dur){
+    if(!freq||!_ctx)return;
+    _note(freq,     dest,vol*1.0, when,       dur);
+    _note(freq*2.0, dest,vol*0.35,when+0.003, dur*0.55);
+    _note(freq*3.0, dest,vol*0.12,when+0.006, dur*0.35);
+  }
+
+  /* GainNode 부드럽게 전환 (fade) */
+  function _fade(gn,to,ms){
+    if(!_ctx)return;
+    const t=_ctx.currentTime;
+    gn.gain.cancelScheduledValues(t);
+    gn.gain.setValueAtTime(gn.gain.value,t);
+    gn.gain.linearRampToValueAtTime(to,t+ms/1000);
+  }
+
+  /* 베이스 BGM 스케줄러 */
+  function _schedule(){
+    if(!_ctx)return;
+    while(_nextTime<_ctx.currentTime+0.10){
+      const i=_step%16;
+      _note(SEQ_BASE[i],  _bGain,0.17,_nextTime,S8*0.78);
+      _note(SEQ_RUSH[i],  _rGain,0.22,_nextTime,S8*0.70,'triangle');
+      _nextTime+=S8; _step++;
+    }
+  }
+
+  /* 피버 전용 스케줄러 — BPM168, 멜로디+킥 독립 루프 */
+  function _fSchedule(){
+    if(!_ctx)return;
+    while(_fNextTime<_ctx.currentTime+0.12){
+      const i=_fStep%32;
+      // 멜로디: 삼각파 — 따뜻하고 선명
+      if(SEQ_FEVER_MELODY[i])
+        _note(SEQ_FEVER_MELODY[i],_fGain,0.20,_fNextTime,SF8*0.72,'triangle');
+      // 킥 저음: 짧은 사인파 펄스
+      if(SEQ_FEVER_KICK[i])
+        _note(SEQ_FEVER_KICK[i], _fGain,0.28,_fNextTime,SF16*0.60,'sine');
+      // 8분마다 고음 액센트 (홀수 박)
+      if(i%4===0 && SEQ_FEVER_MELODY[i]){
+        const acc=SEQ_FEVER_MELODY[i]*2;
+        _note(acc,_fGain,0.06,_fNextTime,SF16*0.40,'sine');
+      }
+      _fNextTime+=SF16; _fStep++;
+    }
+  }
+
+  // ── 공개 API ───────────────────────────────────
+  return{
+    /* 첫 유저 제스처 시 호출 (AudioContext 생성/재개) */
+    init(){ _ensure(); },
+
+    /* 게임 시작 시 BGM 시작 */
+    startBGM(){
+      _ensure();
+      if(_muted)return;
+      _step=0; _nextTime=_ctx.currentTime+0.15;
+      _fade(_bGain,1.0,300);
+      if(_seqTmr)clearInterval(_seqTmr);
+      _seqTmr=setInterval(_schedule,22);
+    },
+
+    /* 게임 종료/로비 복귀 시 BGM 정지 */
+    stopBGM(){
+      if(_seqTmr){clearInterval(_seqTmr);_seqTmr=null;}
+      if(_fTmr){clearInterval(_fTmr);_fTmr=null;}
+      if(!_ctx)return;
+      _fade(_bGain,0,400);_fade(_fGain,0,400);_fade(_rGain,0,400);
+    },
+
+    /* 피버 진입/종료 — 전용 스케줄러 시작/정지 */
+    setFever(on){
+      if(!_ctx)return;
+      if(on){
+        // 베이스 살짝 줄이고 피버 레이어 시작
+        _fade(_bGain,0.35,200);
+        _fade(_fGain,0.88,150);
+        // 피버 전용 스케줄러 독립 시작
+        _fStep=0; _fNextTime=_ctx.currentTime+0.05;
+        if(_fTmr)clearInterval(_fTmr);
+        _fTmr=setInterval(_fSchedule,18);
+      }else{
+        // 피버 종료: 베이스 복귀, 피버 스케줄러 정지
+        if(_fTmr){clearInterval(_fTmr);_fTmr=null;}
+        _fade(_fGain,0,350);
+        _fade(_bGain,1.0,400);
+      }
+    },
+
+    /* lastRush 진입/종료 */
+    setRush(on){
+      if(!_ctx)return;
+      on?_fade(_rGain,0.9,180):_fade(_rGain,0,450);
+    },
+
+    /* 뮤트 토글 — 현재 뮤트 상태 반환 */
+    toggleMute(){
+      _muted=!_muted;
+      if(_ctx)_master.gain.value=_muted?0:0.52;
+      return _muted;
+    },
+
+    get muted(){return _muted;},
+    get _ctx(){return _ctx;},
+    get _master(){return _master;},
+
+    /* SFX — 모두 단발, 자동 정리 */
+    sfx:{
+      /* 3-match 팝 — 마림바 계열: 맑고 통통 튀는 소리 */
+      match(){
+        if(!_ctx||_muted)return;
+        const t=_ctx.currentTime;
+        _chime(880,_master,0.18,t,0.18);          // 메인 A5 차임
+        _note(1320,_master,0.07,t+0.01,0.10);     // 브라이트 하이
+      },
+
+      /* 콤보 n단계 — 피치 상승하는 피아노 아르페지오 */
+      combo(n){
+        if(!_ctx||_muted)return;
+        // 콤보 단계별 음계: C5→E5→G5→C6→E6... 자연스러운 장음계 상승
+        const scale=[523,659,784,1047,1319,1568,2093,2637];
+        const freq=scale[Math.min(n-1,scale.length-1)];
+        const t=_ctx.currentTime;
+        _chime(freq,      _master,0.20,t,      0.22);
+        _chime(freq*1.5,  _master,0.10,t+0.055,0.15);
+      },
+
+      /* 폭탄/무지개 특수블록 — 풍부한 화음 버스트 */
+      special(){
+        if(!_ctx||_muted)return;
+        const t=_ctx.currentTime;
+        // C장조 화음 아르페지오 상승
+        [[523,0],[659,0.04],[784,0.08],[1047,0.12]].forEach(([f,d])=>{
+          _chime(f,_master,0.17,t+d,0.28);
+        });
+      },
+
+      /* 카운트다운 틱 (3·2·1) — 시계 느낌의 짧은 메탈릭 클릭 */
+      countTick(n){
+        if(!_ctx||_muted)return;
+        const t=_ctx.currentTime;
+        // 숫자 클수록 낮은 음 → 3(낮)·2(중)·1(높) 상승으로 긴박감
+        const freq=[0,880,660,520][Math.min(n,3)];
+        _note(freq,    _master,0.22,t,      0.045,'sine');
+        _note(freq*2,  _master,0.08,t+0.01, 0.025,'sine');
+        // 딱딱한 클릭 노이즈 느낌 (고주파 짧게)
+        _note(2200,    _master,0.04,t,      0.018,'square');
+      },
+
+      /* GO! — 강렬한 상승 화음 + 임팩트 */
+      countGo(){
+        if(!_ctx||_muted)return;
+        const t=_ctx.currentTime;
+        // 빠른 상승 아르페지오
+        [[523,0],[659,0.04],[784,0.08],[1047,0.12]].forEach(([f,d])=>{
+          _chime(f,_master,0.22,t+d,0.20);
+        });
+        // 마지막 임팩트 코드
+        _chime(1047,_master,0.28,t+0.18,0.32);
+        _chime(1319,_master,0.18,t+0.19,0.28);
+        _chime(1568,_master,0.12,t+0.20,0.24);
+      },
+
+      /* 게임오버 — 하강 디미니쉬 + 무거운 저음 */
+      gameOver(){
+        if(!_ctx||_muted)return;
+        const t=_ctx.currentTime;
+        // 슬픈 하강 멜로디
+        [[523,0],[415,0.12],[349,0.24],[277,0.38]].forEach(([f,d])=>{
+          _note(f,_master,0.20,t+d,0.18,'sine');
+        });
+        // 무거운 저음 쿵
+        _note(82, _master,0.35,t+0.05,0.45,'sine');
+        _note(110,_master,0.22,t+0.08,0.40,'triangle');
+        // 마지막 페이드아웃 음
+        _note(220,_master,0.14,t+0.52,0.55,'sine');
+      },
+
+      /* 결과창 등장 — 밝은 팡파르 + 별빛 차임 */
+      resultIn(){
+        if(!_ctx||_muted)return;
+        const t=_ctx.currentTime;
+        // 밝은 C장조 팡파르
+        [[523,0],[659,0.08],[784,0.16],[1047,0.24],[1319,0.32]].forEach(([f,d])=>{
+          _chime(f,_master,0.18,t+d,0.24);
+        });
+        // 반짝이는 고음 트레몰로
+        [0,0.10,0.20,0.30].forEach(d=>{
+          _note(2093,_master,0.06,t+0.35+d,0.06,'sine');
+        });
+        // 마지막 안정 화음
+        _chime(1047,_master,0.20,t+0.55,0.40);
+        _chime(1319,_master,0.14,t+0.57,0.36);
+      },
+
+      /* near-miss — 아주 부드러운 소프트 틱 */
+      nearMiss(){
+        if(!_ctx||_muted)return;
+        _note(330,_master,0.06,_ctx.currentTime,0.09,'sine');
+      },
+
+      /* lastRush 힌트 — 상승 두 음 */
+      lastRushHint(){
+        if(!_ctx||_muted)return;
+        const t=_ctx.currentTime;
+        _chime(660,_master,0.10,t,      0.10);
+        _chime(880,_master,0.07,t+0.07, 0.08);
+      },
+
+      /* 피버 진입 — 크리스탈 글리산도 + 팡파르 */
+      feverIn(){
+        if(!_ctx||_muted)return;
+        const t=_ctx.currentTime;
+        // 빠른 상승 아르페지오
+        [523,659,784,1047,1319].forEach((f,i)=>{
+          _chime(f,_master,0.18,t+i*0.055,0.22);
+        });
+        // 마지막 크레셴도 코드
+        _chime(1047,_master,0.22,t+0.30,0.35);
+        _chime(1319,_master,0.14,t+0.32,0.30);
+        _chime(1568,_master,0.10,t+0.34,0.25);
+      }
+    }
+  };
+})();
+
+/* ════════════════════════════════════════════════
+   P2E 서버 검증 파이프라인
+   ─────────────────────────────────────────────
+   원칙:
+   - 프론트 score/combo/guildPts = UI 예측치
+   - 실제 정산은 서버 응답(serverResult)만 사용
+   - 프론트에서 검증 로직 구현 금지
+   - 서버 미연동(fetch 실패) 시 fallback으로 로컬 값 표시 후
+     결과창에 "서버 미검증" 상태 표기
+════════════════════════════════════════════════ */
+
+/* 게임 시작 시 세션 발급 */
+async function startGameSession(){
+  try{
+    const res = await fetch('/api/game/start',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'}
+    });
+    if(!res.ok) throw new Error('session start failed: '+res.status);
+    const data = await res.json();
+    gameSession = {
+      sessionId:    data.sessionId,
+      serverStartAt:data.serverStartAt,
+      nonce:        data.nonce
+    };
+  }catch(e){
+    // 서버 미연동 환경(로컬 테스트 등) — null 유지, submitGameResult에서 처리
+    console.warn('[P2E] startGameSession 실패 (오프라인?)', e.message);
+    gameSession = null;
+  }
+}
+
+/* 게임 종료 시 원시 데이터 전송 → 서버 검증 결과 반환 */
+async function submitGameResult(){
+  /* gameSession이 없으면 서버 미연동 상태 — null 반환 (미검증) */
+  if(!gameSession){
+    return {
+      status:       'OFFLINE',
+      finalScore:   score,
+      guildPts:     null,   // 미검증 — UI에서 '—' 표시
+      farmReduceSec:null    // 미검증 — UI에서 '—' 표시
+    };
+  }
+  const payload = {
+    sessionId:      gameSession.sessionId,
+    score,
+    maxCombo,
+    actions,
+    clientDuration: GAME_SEC - timeLeft,
+    playsLeft,
+    nonce:          gameSession.nonce
+  };
+  try{
+    const res = await fetch('/api/game/complete',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error('submit failed: '+res.status);
+    return await res.json();
+    // 서버 응답 예시: { status:'VALID', finalScore:9999, guildPts:123, farmReduceSec:420 }
+  }catch(e){
+    console.warn('[P2E] submitGameResult 실패', e.message);
+    return {
+      status:       'ERROR',
+      finalScore:   score,
+      guildPts:     null,   // 미검증 — UI에서 '—' 표시
+      farmReduceSec:null    // 미검증 — UI에서 '—' 표시
+    };
+  }
+}
+
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
+/* ── 오디오 SFX 헬퍼 ───────────────────────────
+   역할 분리: match(1콤보) vs combo(2콤보 이상).
+   같은 이벤트에서 둘 다 재생되지 않도록 조건 분기.
+   ─────────────────────────────────────────────
+   playMatchSfx : 단순 제거(1단계). combo < 2일 때만.
+   playComboSfx : 2콤보 이상 누적 보상감. match와 겹치지 않음.
+   → 현재 sfx.match와 sfx.combo(1)은 같은 음이지만,
+     호출 경로가 분리돼 있어 나중에 독립 튜닝 가능.
+────────────────────────────────────────────── */
+function playMatchSfx(comboLevel){
+  if(comboLevel>=2) return;   // 2콤보 이상은 playComboSfx가 담당
+  AudioSys.sfx.match();
+}
+function playComboSfx(comboLevel){
+  if(comboLevel<2) return;    // 1단계는 playMatchSfx가 담당
+  AudioSys.sfx.combo(comboLevel);
+}
+
+/* toggleMute: 뮤트 버튼 onclick 핸들러 */
+function toggleMute(){
+  const m=AudioSys.toggleMute();
+  const btn=document.getElementById('mute-btn');
+  if(btn) btn.textContent=m?'🔇':'🔊';
+}
+
 /* 최초 DOM 풀 미리 생성 */
-window.addEventListener('DOMContentLoaded',()=>{ initBoardDOM(); });
+window.addEventListener('DOMContentLoaded',()=>{
+  initBoardDOM();
+  // 첫 유저 제스처 시 AudioContext 생성 (브라우저 정책)
+  document.getElementById('phone').addEventListener('pointerdown',()=>AudioSys.init(),{once:true});
+});
 </script>
 </body>
 </html>
