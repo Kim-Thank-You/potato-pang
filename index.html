@@ -338,8 +338,9 @@ body{
 #s-play.fever-mode{background:#060810;} /* 배경 고정, fever 분위기는 board::after ambient로 */
 
 /* ── HUD 전체 래퍼 ── */
+/* WHY: HUD 상하 패딩 축소 — 세로 공간을 보드에 양보 */
 .hud-wrap{
-  padding:8px 18px 6px;flex-shrink:0;
+  padding:2px 16px 0px;flex-shrink:0;
   position:relative;z-index:10;
   background:linear-gradient(to bottom,#060810 85%,rgba(6,8,16,0));
 }
@@ -347,7 +348,7 @@ body{
 /* ── 상단 칩 바: 판수/콤보 — 3순위, 존재감 낮춤 ── */
 .hud-topbar{
   display:flex;justify-content:space-between;align-items:center;
-  margin-bottom:3px;
+  margin-bottom:0px;
 }
 .hud-chip{display:flex;align-items:baseline;gap:4px;}
 .hud-chip-lbl{
@@ -360,14 +361,15 @@ body{
 }
 
 /* ── 스코어 블록 — 1순위 ── */
-.hud-score-block{text-align:center;margin-bottom:4px;}
+/* WHY: 스코어-타임 간격 축소 → 보드 세로 확대 */
+.hud-score-block{text-align:center;margin-bottom:1px;}
 .hud-score-lbl{
   font-size:7px;font-weight:700;color:rgba(255,255,255,0.16);
   letter-spacing:1.5px;text-transform:uppercase;margin-bottom:0;
 }
 /* WHY: 점수만 Orbitron 유지 — 게임의 단 하나 핵심 숫자 */
 .hud-score{
-  font-family:'Orbitron',sans-serif;font-size:44px;font-weight:900;
+  font-family:'Orbitron',sans-serif;font-size:46px;font-weight:900;
   color:var(--white);line-height:1.0;letter-spacing:-1px;
   will-change:transform,opacity;
   white-space:nowrap;          /* 999,999 단위에서 줄바꿈 원천 차단 */
@@ -428,8 +430,9 @@ body{
 }
 /* 타임 숫자 */
 .hud-time{
-  font-family:'Inter','Noto Sans KR',sans-serif;font-size:30px;font-weight:900;
-  color:rgba(255,255,255,0.98);min-width:42px;text-align:right;
+  /* WHY: 타임 30→26px — HUD 세로 공간 절약, 보드 확대 */
+  font-family:'Inter','Noto Sans KR',sans-serif;font-size:22px;font-weight:900;
+  color:rgba(255,255,255,0.98);min-width:34px;text-align:right;
   flex-shrink:0;letter-spacing:-0.5px;
   text-shadow:0 1px 0 rgba(0,0,0,0.4);
 }
@@ -451,7 +454,8 @@ body{
 
 /* 콤보 스트립 (단계별 색상·크기 차등) */
 .combo-strip{
-  height:20px;display:flex;align-items:center;justify-content:center;
+  /* WHY: 콤보 스트립 20→16px — 보드 세로 공간 확보 */
+  height:14px;display:flex;align-items:center;justify-content:center;
   font-size:11px;font-weight:900;color:rgba(167,139,250,0.8);flex-shrink:0;
   opacity:0;transition:opacity .2s;
   letter-spacing:0.5px;
@@ -499,17 +503,19 @@ body{
 /* ════════════════════════════════════
    보드 — 풀스크린 그리드 (파트1 요구사항 4)
 ════════════════════════════════════ */
+/* WHY: 보드 중앙 유지 — 셀 aspect-ratio로 아래쪽 확장 */
 .board-wrap{
   flex:1;display:flex;align-items:center;justify-content:center;
-  padding:4px 8px;position:relative;overflow:hidden;
+  padding:0 2px 12px;position:relative;overflow:hidden;
 }
+/* WHY: max-width만으로 크기 제어. 정사각형 셀이 가로폭에 맞춰 자동 결정 */
 .board{
   display:grid;
   grid-template-columns:repeat(7,1fr);
-  gap:4px;
+  gap:2px;
   width:100%;
-  max-width:378px;
-  touch-action:none;    /* 보드 위 모든 터치 기본 동작(스크롤/줌) 차단 */
+  max-width:440px;
+  touch-action:none;
   user-select:none;
 }
 
@@ -523,17 +529,19 @@ body{
   --ease-weight:cubic-bezier(0.2,0.8,0.3,1);
 }
 
+/* WHY: aspect-ratio 복원 — 정사각형 블록 유지. 크기는 board max-width로 제어 */
 .cell{
-  aspect-ratio:1;border-radius:14px;
+  aspect-ratio:1/1.12;border-radius:10px;
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;position:relative;overflow:hidden;
   will-change:transform,opacity;
   contain:layout style;
+  /* WHY: 유리 질감 — 상단 넓은 반사 + 하단 깊은 음영 + 반투명 테두리 */
   box-shadow:
-    inset 0 2.5px 0 rgba(255,255,255,0.22),
-    inset 0 -2.5px 0 rgba(0,0,0,0.34),
-    0 3px 6px rgba(0,0,0,0.36);
-  border:1.5px solid transparent;
+    inset 0 8px 12px -4px rgba(255,255,255,0.25),
+    inset 0 -6px 10px -4px rgba(0,0,0,0.4),
+    0 2px 4px rgba(0,0,0,0.3);
+  border:1px solid rgba(255,255,255,0.15);
   user-select:none;touch-action:none;
   transition:transform .10s var(--ease-snap);
 }
@@ -541,34 +549,30 @@ body{
   transform:scale(0.94);
   transition:transform .04s ease-out;
 }
-.cell svg{width:84%;height:84%;display:block;overflow:visible;}
+/* WHY: 셀 안에서 감자가 꽉 차되 오버레이 여백 확보 */
+.cell svg{width:92%;height:92%;display:block;overflow:visible;}
 
 /* WHY: 깊은 크림슨 + 상단 warm highlight로 불 속성 묵직함 */
-/* WHY: 채도 10~15% 낮춤 + 하이라이트 절제 → 플라스틱→보석 */
+/* WHY: 유리 — 상단 밝고 하단 어둡게 + 높은 투명도 + 넓은 내부 반사 */
 .p0{
-  background:linear-gradient(155deg,#220404 0%,#8c1818 35%,#b82020 65%,#cc3838 100%);
-  border-color:rgba(188,40,40,0.4);
-  box-shadow:inset 0 2px 0 rgba(255,160,140,0.2),inset 0 -3px 0 rgba(0,0,0,0.5),0 3px 7px rgba(140,10,10,0.3);
+  background:linear-gradient(170deg,rgba(255,110,110,0.78) 0%,rgba(220,50,50,0.85) 40%,rgba(160,25,25,0.92) 100%);
+  border-color:rgba(255,160,160,0.3);
 }
 .p1{
-  background:linear-gradient(155deg,#042228 0%,#087898 30%,#10a0c0 60%,#30c8e0 100%);
-  border-color:rgba(48,200,224,0.4);
-  box-shadow:inset 0 2px 0 rgba(180,240,255,0.3),inset 0 -3px 0 rgba(0,0,0,0.3),0 3px 6px rgba(8,120,152,0.3);
+  background:linear-gradient(170deg,rgba(80,230,255,0.72) 0%,rgba(30,190,230,0.8) 40%,rgba(15,130,175,0.88) 100%);
+  border-color:rgba(140,240,255,0.3);
 }
 .p2{
-  background:linear-gradient(155deg,#041c0c 0%,#0a5828 30%,#148840 60%,#1ca050 100%);
-  border-color:rgba(28,160,80,0.4);
-  box-shadow:inset 0 2px 0 rgba(120,230,160,0.2),inset 0 -3px 0 rgba(0,0,0,0.45),0 3px 6px rgba(8,96,38,0.28);
+  background:linear-gradient(170deg,rgba(80,230,120,0.72) 0%,rgba(30,180,75,0.8) 40%,rgba(15,110,50,0.88) 100%);
+  border-color:rgba(120,240,160,0.3);
 }
 .p3{
-  background:linear-gradient(155deg,#3c2800 0%,#8c6000 28%,#b88810 58%,#d8a820 100%);
-  border-color:rgba(216,168,32,0.45);
-  box-shadow:inset 0 2px 0 rgba(255,230,120,0.3),inset 0 -3px 0 rgba(0,0,0,0.3),0 3px 6px rgba(160,112,8,0.3);
+  background:linear-gradient(170deg,rgba(255,235,90,0.8) 0%,rgba(245,200,40,0.85) 40%,rgba(200,150,15,0.9) 100%);
+  border-color:rgba(255,240,120,0.35);
 }
 .p4{
-  background:linear-gradient(155deg,#140540 0%,#380a84 30%,#5820a0 60%,#7840b8 100%);
-  border-color:rgba(120,64,184,0.4);
-  box-shadow:inset 0 2px 0 rgba(180,150,240,0.25),inset 0 -3px 0 rgba(0,0,0,0.5),0 3px 7px rgba(76,24,160,0.3);
+  background:linear-gradient(170deg,rgba(180,110,255,0.72) 0%,rgba(130,65,210,0.8) 40%,rgba(80,30,150,0.88) 100%);
+  border-color:rgba(190,130,255,0.25);
 }
 /* WHY: 묵직한 흑철 — filter 제거하고 border-color로 숨결 표현 */
 .p-bomb{
@@ -650,7 +654,8 @@ body{
   50%{opacity:0.15;}
 }
 
-.play-bottom{padding:6px 16px 12px;flex-shrink:0;display:flex;gap:8px;align-items:center;}
+/* WHY: 하단 패딩 축소 — 보드 세로 공간 확보 */
+.play-bottom{padding:2px 16px 4px;flex-shrink:0;display:flex;gap:8px;align-items:center;}
 /* ── 포기 확인 오버레이 ── */
 .quit-overlay{
   position:absolute;inset:0;z-index:120;
@@ -918,23 +923,72 @@ body{
 }
 @keyframes ptclFly{0%{transform:translate(0,0) scale(1);opacity:0.65;}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0;}}
 
-/* ── 보조 오브젝트 오버레이 ── */
-.cell-ov{
-  position:absolute;top:-2px;right:-2px;font-size:10px;z-index:5;
-  background:rgba(0,0,0,0.5);border-radius:50%;padding:2px;
-  /* WHY: filter:drop-shadow → box-shadow. 49셀 각각에 filter는 과함 */
-  box-shadow:0 1px 2px rgba(0,0,0,0.4);
-  /* WHY: 상시 pulse 제거 — spawn 시 ov-spawn 1회만 동작 */
-  line-height:1;
-}
+/* WHY: 특수블록 — 중앙 심볼 + 은은한 오로라 glow. box-shadow only, filter 없음 */
 .cell.has-gold{
-  box-shadow:inset 0 0 0 1.2px rgba(251,191,36,0.4)!important;
+  box-shadow:inset 0 0 0 2px rgba(212,165,16,0.5),
+    0 0 8px rgba(212,165,16,0.35),0 0 18px rgba(245,158,11,0.15)!important;
+  animation:auroraGold 2.5s ease-in-out infinite!important;
 }
 .cell.has-clock{
-  box-shadow:inset 0 0 0 1.2px rgba(74,222,128,0.38)!important;
+  box-shadow:inset 0 0 0 2px rgba(20,184,166,0.45),
+    0 0 8px rgba(20,184,166,0.3),0 0 18px rgba(6,182,212,0.12)!important;
+  animation:auroraClock 2.5s ease-in-out infinite!important;
 }
 .cell.has-star{
-  box-shadow:inset 0 0 0 1.2px rgba(167,139,250,0.4)!important;
+  box-shadow:inset 0 0 0 2px rgba(124,58,237,0.45),
+    0 0 8px rgba(124,58,237,0.3),0 0 18px rgba(167,139,250,0.15)!important;
+  animation:auroraStar 2.5s ease-in-out infinite!important;
+}
+/* WHY: 오로라 — box-shadow 반경만 호흡. transform/filter 없이 GPU 안전 */
+@keyframes auroraGold{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(212,165,16,0.5),0 0 8px rgba(212,165,16,0.35),0 0 18px rgba(245,158,11,0.15);}
+  50%{box-shadow:inset 0 0 0 2px rgba(212,165,16,0.6),0 0 12px rgba(212,165,16,0.45),0 0 24px rgba(245,158,11,0.2);}
+}
+@keyframes auroraClock{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(20,184,166,0.45),0 0 8px rgba(20,184,166,0.3),0 0 18px rgba(6,182,212,0.12);}
+  50%{box-shadow:inset 0 0 0 2px rgba(20,184,166,0.55),0 0 12px rgba(20,184,166,0.4),0 0 24px rgba(6,182,212,0.18);}
+}
+@keyframes auroraStar{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(124,58,237,0.45),0 0 8px rgba(124,58,237,0.3),0 0 18px rgba(167,139,250,0.15);}
+  50%{box-shadow:inset 0 0 0 2px rgba(124,58,237,0.55),0 0 12px rgba(124,58,237,0.4),0 0 24px rgba(167,139,250,0.22);}
+}
+/* WHY: 번개/복제/연쇄 — 각 속성 톤의 절제된 오로라 */
+.cell.has-lightning{
+  box-shadow:inset 0 0 0 2px rgba(251,191,36,0.5),
+    0 0 8px rgba(251,191,36,0.35),0 0 18px rgba(217,119,6,0.15)!important;
+  animation:auroraLightning 2.5s ease-in-out infinite!important;
+}
+.cell.has-clone{
+  box-shadow:inset 0 0 0 2px rgba(96,165,250,0.45),
+    0 0 8px rgba(96,165,250,0.3),0 0 18px rgba(37,99,235,0.15)!important;
+  animation:auroraClone 2.5s ease-in-out infinite!important;
+}
+.cell.has-chain{
+  box-shadow:inset 0 0 0 2px rgba(244,114,182,0.45),
+    0 0 8px rgba(244,114,182,0.3),0 0 18px rgba(236,72,153,0.15)!important;
+  animation:auroraChain 2.5s ease-in-out infinite!important;
+}
+@keyframes auroraLightning{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(251,191,36,0.5),0 0 8px rgba(251,191,36,0.35),0 0 18px rgba(217,119,6,0.15);}
+  50%{box-shadow:inset 0 0 0 2px rgba(251,191,36,0.6),0 0 12px rgba(251,191,36,0.45),0 0 24px rgba(217,119,6,0.2);}
+}
+@keyframes auroraClone{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(96,165,250,0.45),0 0 8px rgba(96,165,250,0.3),0 0 18px rgba(37,99,235,0.15);}
+  50%{box-shadow:inset 0 0 0 2px rgba(96,165,250,0.55),0 0 12px rgba(96,165,250,0.4),0 0 24px rgba(37,99,235,0.2);}
+}
+@keyframes auroraChain{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(244,114,182,0.45),0 0 8px rgba(244,114,182,0.3),0 0 18px rgba(236,72,153,0.15);}
+  50%{box-shadow:inset 0 0 0 2px rgba(244,114,182,0.55),0 0 12px rgba(244,114,182,0.4),0 0 24px rgba(236,72,153,0.2);}
+}
+/* WHY: 특수 심볼은 감자(84%)보다 작게 — 배경색 안에서 또렷하게 */
+/* WHY: 기본 감자 SVG 크기는 .cell svg(84%)를 상속. 오버레이는 ov-icon으로 격리 */
+svg.ov-icon{
+  position:absolute!important;
+  top:50%!important;left:50%!important;
+  transform:translate(-50%,-50%)!important;
+  width:58%!important;height:58%!important;
+  z-index:2!important;
+  pointer-events:none!important;
 }
 .cell.ov-spawn{animation:ovSpawn .40s cubic-bezier(0.22,1,0.36,1)!important;}
 @keyframes ovSpawn{
@@ -974,7 +1028,7 @@ body{
 /* ── 피버 게이지 ── */
 .fever-gauge{
   width:160px;height:4px;background:rgba(255,255,255,0.06);border-radius:100px;
-  margin:3px auto 0;overflow:hidden;opacity:0;transition:opacity .3s;
+  margin:1px auto 0;overflow:hidden;opacity:0;transition:opacity .3s;
 }
 .fever-gauge.show{opacity:1;}
 .fever-gauge-fill{
@@ -1011,8 +1065,14 @@ body{
 /* WHY: lv2에서 상시 반복 애니메이션 전부 중단 — GPU 부하 최소화 */
 #s-play.perf-low .board-wrap::after,
 #s-play.perf-low .fever-banner,
-#s-play.perf-low .combo-strip{animation:none!important;}
-#s-play.perf-low .cell-ov{animation:none!important;}
+#s-play.perf-low .combo-strip,
+#s-play.perf-low .cell.has-gold,
+#s-play.perf-low .cell.has-clock,
+#s-play.perf-low .cell.has-star,
+#s-play.perf-low .cell.has-lightning,
+#s-play.perf-low .cell.has-clone,
+#s-play.perf-low .cell.has-chain{animation:none!important;}
+/* cell-ov 배지 방식 제거됨 — 이 룰은 더 이상 매칭 없음 */
 /* ── 큰 스코어 팝업 (하이콤보/피버) ── */
 .score-pop.big{font-size:17px;animation:scorePopBig .5s cubic-bezier(.2,.8,.3,1) forwards;}
 /* ── score-pop.lr : lastRush 구간 숫자 체공 시간 소폭 연장 ──
@@ -1498,8 +1558,26 @@ const TYPE_BOMB=5, TYPE_RAINBOW=6;
 const BASE_SCORE=4, COMBO_MULT=0.3;
 const BOMB_BONUS=25, RAINBOW_BONUS=50;
 const FEVER_MULT=1.5, AD_MULT=2;
-const GRID_GAP=4; // CSS gap (px)
-const GOLD_BONUS=100, CLOCK_BONUS=3, STAR_COMBO=2;
+const GRID_GAP=2; // CSS gap (px)
+/* WHY: 특수 감자 리워크 — 골드=1줄제거+게이지, 시계=+3초+주변8칸, 별=배율+대량게이지 */
+const GOLD_BONUS=25, CLOCK_BONUS=3, STAR_COMBO=2;
+
+/* ── 피버 게이지 상수 ──────────────────────────────
+   콤보 기반 피버 → 점수(매치) 기반 게이지로 전환.
+   feverGauge 0~100. threshold 도달 시 발동.
+   한 판 1~2회 발동 목표.
+──────────────────────────────────────────────────── */
+const FG_MAX = 100;
+const FG_THRESHOLD = 100;       // 발동 임계값
+const FG_3MATCH = 8;            // 3매치 기본 적립
+const FG_4MATCH = 18;           // 4매치
+const FG_5MATCH = 30;           // 5매치+
+const FG_CHAIN_BONUS = 4;       // 연쇄당 추가
+const FG_OVERLAY_GOLD = 15;     // 골드 감자 매치 시 추가
+const FG_OVERLAY_STAR = 25;     // 별 감자 매치 시 추가
+const FG_FEVER_DUR = 6;         // 피버 지속 시간 (초)
+const FG_FEVER_MULT = 1.8;      // 피버 점수 배율
+const FG_DEBUG = false;
 
 /* ── Last Rush 전용 상수 ──────────────────────────
    수치 조정은 여기서만. 코드 내부 하드코딩 금지.
@@ -1855,6 +1933,12 @@ let gameSession = null;
 let actions     = [];
 let _serverResult = null;
 let adBoostOn=true, combo=0, maxCombo=0;
+/* WHY: 피버 게이지 — 콤보 기반 제거, 매치 품질 기반으로 전환 */
+let feverGauge=0;
+/* WHY: 특수 감자 확장 — extraChain/forceExtraChain은 체인 루프에서 참조 */
+let extraChainCount=0;
+let forceExtraChain=false;
+let turnScoreMult=1.0; // 별 감자 발동 시 해당 턴 배율
 let isAnimating=false;          // 파트1-1: 입력 락 플래그
 let selected=null;              // {r, c}
 let gameTimer=null, comboTimer=null;
@@ -2121,6 +2205,19 @@ function initBoardDOM(){
 }
 
 /** 단일 셀 DOM 업데이트 (innerHTML + className만 교체) */
+/* WHY: 특수블록 → 감자 대신 중앙 심볼로 교체. 배경색은 유지 */
+/* WHY: 병합 렌더링 — 감자 SVG 위에 ov-icon을 absolute로 겹침. gold는 방향별 분리. */
+const OV_SYMBOL={
+  gold_row:'<svg class="ov-icon" viewBox="0 0 40 40"><circle cx="20" cy="20" r="12" fill="#D4A510" stroke="#8B6914" stroke-width="1.5"/><circle cx="20" cy="20" r="8" fill="#F5D060"/><text x="20" y="25" text-anchor="middle" font-size="14" font-weight="900" fill="#8B6914">$</text><line x1="6" y1="20" x2="34" y2="20" stroke="#8B6914" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.6"/></svg>',
+  gold_col:'<svg class="ov-icon" viewBox="0 0 40 40"><circle cx="20" cy="20" r="12" fill="#D4A510" stroke="#8B6914" stroke-width="1.5"/><circle cx="20" cy="20" r="8" fill="#F5D060"/><text x="20" y="25" text-anchor="middle" font-size="14" font-weight="900" fill="#8B6914">$</text><line x1="20" y1="6" x2="20" y2="34" stroke="#8B6914" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.6"/></svg>',
+  clock:'<svg class="ov-icon" viewBox="0 0 40 40"><circle cx="20" cy="20" r="12" fill="#0D9488" stroke="#065F56" stroke-width="1.5"/><circle cx="20" cy="20" r="8.5" fill="#14B8A6"/><line x1="20" y1="14" x2="20" y2="20" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="20" y1="20" x2="25" y2="23" stroke="white" stroke-width="1.5" stroke-linecap="round"/><circle cx="20" cy="20" r="1.2" fill="white"/></svg>',
+  star:'<svg class="ov-icon" viewBox="0 0 40 40"><path d="M20 6L23.5 15L33 15.5L25.5 21.5L28 31L20 25.5L12 31L14.5 21.5L7 15.5L16.5 15Z" fill="#A78BFA" stroke="#7C3AED" stroke-width="1.2"/></svg>',
+  lightning:'<svg class="ov-icon" viewBox="0 0 40 40"><path d="M22 6L16 19H22L18 34L28 18H21L26 6Z" fill="#FBBF24" stroke="#D97706" stroke-width="1.2"/></svg>',
+  clone:'<svg class="ov-icon" viewBox="0 0 40 40"><circle cx="14" cy="20" r="6" fill="#60A5FA" stroke="#2563EB" stroke-width="1"/><circle cx="26" cy="20" r="6" fill="#60A5FA" stroke="#2563EB" stroke-width="1"/><path d="M18 17L22 20L18 23" stroke="#2563EB" stroke-width="2" fill="none" stroke-linecap="round"/></svg>',
+  chain:'<svg class="ov-icon" viewBox="0 0 40 40"><ellipse cx="14" cy="20" rx="6" ry="8" fill="none" stroke="#F472B6" stroke-width="2.5"/><ellipse cx="26" cy="20" rx="6" ry="8" fill="none" stroke="#F472B6" stroke-width="2.5"/></svg>'
+};
+/* WHY: 병합 렌더링 — 기본 감자 SVG 위에 오버레이 심볼을 absolute로 겹침.
+   골드는 goldDir로 O(1) 키 매핑 (gold_row / gold_col). 문자열 치환 없음. */
 function updateCell(r,c){
   const t=board[r][c].type;
   const el=cellEls[r][c];
@@ -2128,7 +2225,11 @@ function updateCell(r,c){
   const ov=board[r][c].overlay;
   el.className='cell '+TYPE_CLASS[t]+(ov?' has-'+ov:'');
   let html=SVG_DATA[t]||'';
-  if(ov){const ic={gold:'💰',clock:'⏰',star:'⭐'};html+=`<div class="cell-ov">${ic[ov]}</div>`;}
+  if(ov){
+    let ovKey=ov;
+    if(ov==='gold') ovKey=board[r][c].goldDir==='row'?'gold_row':'gold_col';
+    if(OV_SYMBOL[ovKey]) html+=OV_SYMBOL[ovKey];
+  }
   el.innerHTML=html;
 }
 
@@ -2428,11 +2529,12 @@ async function processMatches(matches){
   if(combo>1) feelLog('연쇄', combo+'단계', (Date.now()-_feelSwapT0)+'ms 경과');
 
   // 점수 (파트1 요구사항5 밸런스 유지)
-  const mC=1+combo*COMBO_MULT, mF=isFever?FEVER_MULT:1, mA=adBoostOn?AD_MULT:1;
-  const mainPts=Math.floor(matches.length*BASE_SCORE*mC*mF*mA);
+  /* WHY: turnScoreMult = 별 감자 발동 시 해당 턴 배율 (기본 1.0) */
+  const mC=1+combo*COMBO_MULT, mF=isFever?FG_FEVER_MULT:1, mA=adBoostOn?AD_MULT:1;
+  const mainPts=Math.floor(matches.length*BASE_SCORE*mC*mF*mA*turnScoreMult);
   addScore(mainPts);
   showCombo(combo);
-  if(combo>=5&&!isFever)startFever();
+  /* WHY: 콤보 기반 피버 트리거 제거 — 피버는 오직 feverGauge로만 발동 */
   // playMatchSfx는 matchTier 계산 후 아래에서 호출
   playComboSfx(combo); // combo≥2: combo 보상음
 
@@ -2478,15 +2580,72 @@ async function processMatches(matches){
 
   const exCells=[...exSet].map(k=>{const[r,c]=k.split(',').map(Number);return{r,c};});
 
-  // ── 보조 오브젝트 보너스 ──
+  // ── 보조 오브젝트 보너스 (리워크) ──
   let ovBonus=0,ovMsgs=[];
   exCells.forEach(({r,c})=>{
     const ov=board[r][c].overlay;if(!ov)return;
-    if(ov==='gold'){const b=Math.floor(GOLD_BONUS*mA);ovBonus+=b;overlayStats.gold++;ovMsgs.push('💰 +'+b);}
-    if(ov==='clock'){timeLeft+=CLOCK_BONUS;overlayStats.clock++;ovMsgs.push('⏰ +'+CLOCK_BONUS+'초');updateHUD();}
-    if(ov==='star'){combo+=STAR_COMBO;if(combo>maxCombo)maxCombo=combo;overlayStats.star++;ovMsgs.push('⭐ 콤보↑');showCombo(combo);if(combo>=5&&!isFever)startFever();}
+    if(ov==='gold'){
+      /* WHY: 골드 — goldDir 기반 줄 제거 + 게이지. 방향은 생성 시 결정 */
+      overlayStats.gold++;
+      const dir=board[r][c].goldDir||'row';
+      if(dir==='row'){for(let cc=0;cc<COLS;cc++)exSet.add(`${r},${cc}`);}
+      else{for(let rr=0;rr<ROWS;rr++)exSet.add(`${rr},${c}`);}
+      ovBonus+=GOLD_BONUS;
+      ovMsgs.push('💰 줄삭제!');
+      triggerShake();
+    }
+    if(ov==='clock'){
+      /* WHY: 시계 — +3초 + 주변 8칸 제거 */
+      overlayStats.clock++;
+      timeLeft+=CLOCK_BONUS;
+      for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+        const nr=r+dr,nc=c+dc;
+        if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS)exSet.add(`${nr},${nc}`);
+      }
+      ovMsgs.push('⏰ +'+CLOCK_BONUS+'초!');
+      updateHUD();
+    }
+    if(ov==='star'){
+      /* WHY: 별 — 배율 강화(해당 턴) + 게이지 대량 적립 */
+      overlayStats.star++;
+      turnScoreMult=1.8;
+      forceExtraChain=true;
+      ovMsgs.push('⭐ 배율UP!');
+    }
+    if(ov==='lightning'){
+      /* WHY: 번개 — 해당 셀과 동일 타입 전체 제거. 판을 뒤집는 핵심 무기 */
+      const targetType=board[r][c].type;
+      if(targetType>=0&&targetType<5){
+        for(let rr=0;rr<ROWS;rr++)for(let cc=0;cc<COLS;cc++){
+          if(board[rr][cc].type===targetType)exSet.add(`${rr},${cc}`);
+        }
+      }
+      ovMsgs.push('⚡ 동색제거!');
+      triggerShake();
+    }
+    if(ov==='clone'){
+      /* WHY: 복제 — 주변 8칸을 동일 타입으로 변환. 다음 매치 유리하게 */
+      const srcType=board[r][c].type;
+      if(srcType>=0&&srcType<5){
+        for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+          const nr=r+dr,nc=c+dc;
+          if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!exSet.has(`${nr},${nc}`)){
+            board[nr][nc].type=srcType;
+            board[nr][nc].overlay=null; // 복제된 셀의 기존 오버레이 제거
+          }
+        }
+      }
+      ovMsgs.push('🔄 복제!');
+    }
+    if(ov==='chain'){
+      /* WHY: 연쇄 — 자동 체인 2~3회 추가. 콤보 부스트 */
+      extraChainCount+=Math.floor(Math.random()*2)+2;
+      ovMsgs.push('🔗 연쇄!');
+    }
   });
-  if(ovBonus>0)addScore(ovBonus);
+  // exCells 재계산 (골드/시계가 exSet 확장했으므로)
+  const exCellsFinal=[...exSet].map(k=>{const[r,c]=k.split(',').map(Number);return{r,c};});
+  if(ovBonus>0)addScore(Math.floor(ovBonus*mA));
   if(ovMsgs.length>0)showToast(ovMsgs.join(' '));
 
   // ── 매치 단계 판정 (3/4/5+) ──
@@ -2495,12 +2654,23 @@ async function processMatches(matches){
   if(hasBomb)matchTier=Math.max(matchTier,1);
   if(hasRainbow)matchTier=2;
 
+  /* WHY: feverGauge 적립 — 매치 품질 + 연쇄 + 특수감자 기반. 콤보 무관. */
+  if(!isFever){
+    let fg=matchTier>=2?FG_5MATCH:matchTier>=1?FG_4MATCH:FG_3MATCH;
+    if(combo>=2) fg+=FG_CHAIN_BONUS*Math.min(combo-1,5); // 연쇄 보너스 (최대 5단계)
+    // 특수 감자 보너스 (이미 처리된 ovMsgs 기반)
+    if(ovMsgs.some(m=>m.includes('💰'))) fg+=FG_OVERLAY_GOLD;
+    if(ovMsgs.some(m=>m.includes('⭐'))) fg+=FG_OVERLAY_STAR;
+    addFeverGauge(fg);
+  }
+
   // WHY: matchTier 확정 후 단계별 효과음 호출
   playMatchSfx(combo,matchTier);
 
+  /* WHY: 특수 감자가 exSet을 확장했으므로 exCellsFinal 사용 */
   // ── 플로팅 스코어 팝업 (단계별 차등) ──
-  if(exCells.length>0){
-    const mid=exCells[Math.floor(exCells.length/2)];
+  if(exCellsFinal.length>0){
+    const mid=exCellsFinal[Math.floor(exCellsFinal.length/2)];
     const re=cellEls[mid.r][mid.c].getBoundingClientRect();
     const pr=document.getElementById('phone').getBoundingClientRect();
     const isBig=matchTier>=1||combo>=4||isFever;
@@ -2509,21 +2679,19 @@ async function processMatches(matches){
       isBig,isLastRush);
   }
 
-  /* WHY: 4매치+=강한 플래시. 중반(20~40초) 3매치=약한 플래시 → 중반 피크 체감 */
+  /* WHY: 4매치+=강한 플래시. 중반(20~40초) 3매치=약한 플래시 */
   if(matchTier>=1||(matchTier===0&&timeLeft>=20&&timeLeft<=40&&combo>=2)){
-    exCells.forEach(({r,c})=>{
+    exCellsFinal.forEach(({r,c})=>{
       const el=cellEls[r][c];
       el.classList.add('match-flash');
       addDelay(()=>el.classList.remove('match-flash'),matchTier>=1?180:120);
     });
   }
 
-  // WHY: lowPerfLevel + fever+chain 동시 → 파티클 자동 축소
   const ptclBig=hasBomb||hasRainbow;
   const heavyLoad=isFever&&combo>=3;
-  /* WHY: 3매치=파티클 없음, 4매치=1개, 5매치+=2개. "중요한 순간만 움직여라" */
   const ptclCount=lowPerfLevel>=2?0:lowPerfLevel>=1||heavyLoad?1:matchTier>=2?2:matchTier>=1?1:0;
-  exCells.slice(0,ptclCount).forEach(({r,c})=>{
+  exCellsFinal.slice(0,ptclCount).forEach(({r,c})=>{
     const el=cellEls[r][c];
     const rect=el.getBoundingClientRect();
     const pr=document.getElementById('phone').getBoundingClientRect();
@@ -2531,11 +2699,11 @@ async function processMatches(matches){
   });
 
   // 폭발 클래스
-  exCells.forEach(({r,c})=>cellEls[r][c].classList.add('exploding'));
-  await sleep(EXPLODE_WAIT); // CSS .18s + 5ms 버퍼
+  exCellsFinal.forEach(({r,c})=>cellEls[r][c].classList.add('exploding'));
+  await sleep(EXPLODE_WAIT);
 
-  // 데이터 업데이트 (즉시 발동형: 특수블록 배치 없이 전부 제거)
-  exCells.forEach(({r,c})=>{board[r][c]={type:-1};});
+  // 데이터 업데이트
+  exCellsFinal.forEach(({r,c})=>{board[r][c]={type:-1};});
 
   // 낙하 정보 계산 (dropAndFill 전)
   const fallInfo=getFallInfo();
@@ -2553,10 +2721,15 @@ async function processMatches(matches){
   await animateFall(fallInfo);
 
   // 콤보 체인 체크
-  const next=findMatches();
+  let next=findMatches();
+  /* WHY: forceExtraChain(별) 또는 extraChainCount(연쇄)가 남아있으면 강제 추가 체인 */
+  if(next.length===0&&forceExtraChain){forceExtraChain=false;next=findMatches();}
+  if(next.length===0&&extraChainCount>0){extraChainCount--;dropAndFill();updateAll();next=findMatches();}
   if(next.length>0){
-    await processMatches(next); // 예외 시 trySwap catch로 버블링 → 안전망 작동
+    await processMatches(next);
   }else{
+    /* WHY: 체인 종료 → turnScoreMult 리셋 + extraChain 안전 초기화 */
+    turnScoreMult=1.0;extraChainCount=0;forceExtraChain=false;
     comboTimer=setTimeout(()=>{combo=0;updateHUD();hideCombo();}, getComboWindow());
     // 데드락 체크: 가능한 수가 없으면 자동 셔플
     if(!hasValidMove()){shuffleBoard();updateAll();showToast('🔀 셔플!');}
@@ -2685,29 +2858,49 @@ function updateHUD(){
     fill.style.background=timeLeft<=5?'var(--red)':timeLeft<=LR_TRIGGER_SEC?'#FBBF24':'var(--d)';
   }
 }
+/* WHY: feverGauge 적립 + 임계값 도달 시 피버 발동. 콤보 무관. */
+function addFeverGauge(amount){
+  if(isFever)return; // 피버 중에는 적립 안 함
+  feverGauge=Math.min(FG_MAX,feverGauge+amount);
+  updateFeverGaugeUI();
+  if(FG_DEBUG) console.log('[FG] +'+amount+' → '+feverGauge+'/'+FG_MAX);
+  if(feverGauge>=FG_THRESHOLD){
+    feverGauge=0; // 발동 후 초기화
+    updateFeverGaugeUI();
+    startFever();
+  }
+}
+/* WHY: 게이지 바 시각 업데이트 — 기존 fever-gauge DOM 재사용 */
+function updateFeverGaugeUI(){
+  const gauge=document.getElementById('fever-gauge');
+  const fill=document.getElementById('fever-gauge-fill');
+  if(!gauge||!fill)return;
+  const pct=Math.round(feverGauge/FG_MAX*100);
+  if(pct>0&&!isFever){
+    gauge.className='fever-gauge show'+(pct>=80?' warn':'');
+    fill.style.width=pct+'%';
+  }else if(!isFever){
+    gauge.className='fever-gauge';
+    fill.style.width='0%';
+  }
+}
+
 function showCombo(n){
   if(n<2)return;
   const msgs=['','','×2 COMBO','×3 TRIPLE','×4 QUAD','×5 FEVER','×6 CHAIN'];
   const strip=document.getElementById('combo-strip');
   strip.textContent=msgs[Math.min(n,msgs.length-1)]||('×'+n+' CHAIN');
   strip.className='combo-strip show'+(n>=5?' c5':n>=4?' c4':n>=3?' c3':'');
-  // 피버 게이지
-  const gauge=document.getElementById('fever-gauge');
-  const fill=document.getElementById('fever-gauge-fill');
-  if(n>=2&&n<5&&!isFever){
-    gauge.className='fever-gauge show'+(n>=4?' warn':'');
-    fill.style.width=Math.min(100,n*20)+'%';
-  }else{gauge.className='fever-gauge';fill.style.width='0%';}
-  // Anticipation: combo 4 = 게이지 80% = 피버 1콤보 전
-  if(n===ANTCP_COMBO&&!isFever) enterNearFever();
-  else exitNearFever(false);
+  /* WHY: 피버 게이지는 addFeverGauge에서 관리. showCombo는 콤보 텍스트만 담당.
+     Anticipation은 게이지 80% 기준으로 전환 */
+  if(feverGauge>=FG_MAX*0.8&&!isFever) enterNearFever();
+  else if(feverGauge<FG_MAX*0.8) exitNearFever(false);
   updateHUD();
 }
 function hideCombo(){
   document.getElementById('combo-strip').className='combo-strip';
-  document.getElementById('fever-gauge').className='fever-gauge';
-  document.getElementById('fever-gauge-fill').style.width='0%';
-  exitNearFever(false); // 콤보 끊김 → anticipation 해제
+  /* WHY: 콤보 끊김 시 게이지는 유지 — feverGauge는 콤보와 독립 */
+  exitNearFever(false);
 }
 
 function triggerShake(){
@@ -2719,12 +2912,13 @@ function triggerShake(){
 function startFever(){
   perfTag('fever_start');
   exitNearFever(true);
-  isFever=true;feverLeft=12;
+  /* WHY: 피버 지속 시간 FG_FEVER_DUR(6초) — 12초에서 축소, 희소성 강화 */
+  isFever=true;feverLeft=FG_FEVER_DUR;
   AudioSys.sfx.feverIn();   // 피버 팡파르
   AudioSys.setFever(true);  // fever 레이어 fade in
   document.getElementById('s-play').classList.add('fever-mode');
   const b=document.getElementById('fever-banner');b.classList.add('on');
-  document.getElementById('fever-t').textContent=12;
+  document.getElementById('fever-t').textContent=FG_FEVER_DUR;
   // 진입 플래시 + 파티클 버스트
   const fl=document.getElementById('fever-flash');
   fl.classList.remove('on');void fl.offsetWidth;fl.classList.add('on');
@@ -3101,7 +3295,17 @@ function spawnOverlay(){
   if(!cands.length)return;
   const {r,c}=cands[Math.floor(Math.random()*cands.length)];
   const roll=Math.random();
-  board[r][c].overlay=roll<0.45?'gold':roll<0.78?'clock':'star';
+  /* WHY: 6종 확률분배 — 일반(gold/clock/star) 70%, 희귀(lightning/clone/chain) 30% */
+  let ov;
+  if(roll<0.28)ov='gold';
+  else if(roll<0.50)ov='clock';
+  else if(roll<0.70)ov='star';
+  else if(roll<0.80)ov='lightning';
+  else if(roll<0.90)ov='clone';
+  else ov='chain';
+  board[r][c].overlay=ov;
+  /* WHY: 골드 감자에 방향 속성 부여 — 생성 시 결정, 매치 시 사용 */
+  if(ov==='gold') board[r][c].goldDir=Math.random()<0.5?'row':'col';
   updateCell(r,c);
   const el=cellEls[r][c];
   /* WHY: addDelay로 등록 → 게임 종료 시 clearAllDelays로 일괄 정리 */
@@ -3361,7 +3565,9 @@ function showResult(serverResult){
 ════════════════════════════════════════════════ */
 function startGame(){
   playsLeft--;
-  score=0;timeLeft=GAME_SEC;combo=0;maxCombo=0;overlayStats={gold:0,clock:0,star:0};usedDiamond=false;usedAd=false;
+  score=0;timeLeft=GAME_SEC;combo=0;maxCombo=0;feverGauge=0;
+  extraChainCount=0;forceExtraChain=false;turnScoreMult=1.0;
+  overlayStats={gold:0,clock:0,star:0};usedDiamond=false;usedAd=false;
   isFever=false;isAnimating=false;selected=null;_ending=false;_ptclCount=0;_ovCount=0;
   isLastRush=false;lastRushTriggered=false;scoreAtRushStart=0;
   nmLastTime=0; nmStats={fail:0,detect:0,fire:0,cooldown:0,skip:0};
