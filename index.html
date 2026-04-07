@@ -268,7 +268,7 @@ body{
   background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.15);
   border-radius:10px;padding:clamp(4px,0.8vh,7px) 14px;color:var(--g);display:inline-block;
 }
-.tier-sub{font-size:10px;color:rgba(255,255,255,0.38);margin-top:clamp(4px,0.8vh,8px);line-height:1.4;}
+.tier-sub{font-size:10px;color:rgba(255,255,255,0.55);margin-top:clamp(4px,0.8vh,8px);line-height:1.4;}
 /* ── 2군: 광고 카드 ── */
 .ad-card{
   background:rgba(14,18,32,0.62);
@@ -339,18 +339,26 @@ body{
   height:1px;background:rgba(255,255,255,0.06);margin:clamp(6px,1.2vh,12px) 0;
   width:100%;
 }
+/* WHY: 불투명 골드 + 유리 하이라이트 ::before — 밝고 강한 CTA */
 .start-btn{
-  width:100%;padding:clamp(14px,2.5vh,18px);border-radius:16px;border:none;
-  /* WHY: #D4A510→#C8A208 톤다운 + glow 축소 → 묵직한 프리미엄 CTA */
-  background:linear-gradient(135deg,#C8A208,#D4920A,#B87806);color:#0a0800;
-  font-size:15px;font-weight:900;font-family:'Inter','Noto Sans KR',sans-serif;
+  width:100%;padding:16px;border-radius:18px;border:none;
+  background:linear-gradient(180deg,#FFD54F 0%,#FBBF24 40%,#E8A817 100%);
+  border:1px solid rgba(255,255,255,0.3);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,0.45),inset 0 -2px 4px rgba(0,0,0,0.15),0 4px 14px rgba(251,191,36,0.35);
+  color:#1a1000;font-size:18px;font-weight:900;font-family:'Inter','Noto Sans KR',sans-serif;
   cursor:pointer;position:relative;overflow:hidden;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.18),0 3px 12px rgba(160,110,0,0.25);
-  text-shadow:0 1px 2px rgba(60,30,0,0.3);
-  transition:transform .1s;display:block;letter-spacing:0.3px;
+  transition:transform .08s ease;display:block;letter-spacing:0.3px;
+}
+.start-btn::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:45%;
+  background:linear-gradient(180deg,rgba(255,255,255,0.35),rgba(255,255,255,0.1),transparent);
+  pointer-events:none;
 }
 .start-btn::after{content:none;}
-.start-btn:active{transform:scale(.97);}
+.start-btn:active{
+  transform:scale(0.95);
+  box-shadow:inset 0 2px 4px rgba(0,0,0,0.3),0 2px 6px rgba(251,191,36,0.2);
+}
 
 /* ════════════════════════════════════
    인게임 HUD — 리디자인
@@ -410,17 +418,22 @@ body{
 .hud-score-lbl{display:none;}
 /* WHY: 점수만 Orbitron 유지 — 게임의 단 하나 핵심 숫자 */
 /* WHY: 이미지 레퍼런스 — 골드 세리프 대형 점수. 묵직한 금색+그림자 */
+/* WHY: 점수 = 유일한 gradient 텍스트. 프리미엄 골드 → 시선 집중 */
 .hud-score{
   font-family:'Orbitron',sans-serif;font-size:52px;font-weight:900;
-  color:#D4A520;line-height:1.0;letter-spacing:-1px;
+  /* WHY: 하단 #B8860B→#D4A520으로 밝게 — 어두운 배경에서도 선명 */
+  background:linear-gradient(180deg,#FFE88A 0%,#FBBF24 50%,#D4A520 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+  line-height:1.0;letter-spacing:-1px;
   min-height:54px;display:flex;align-items:center;justify-content:center;
   will-change:transform,opacity;
   white-space:nowrap;
-  text-shadow:0 2px 4px rgba(0,0,0,0.7),0 0 12px rgba(212,165,32,0.15);
 }
 #s-play.fever-mode .hud-score{
-  color:var(--g);
-  text-shadow:0 2px 0 rgba(0,0,0,0.45),0 0 16px rgba(251,191,36,0.18);
+  background:linear-gradient(180deg,#FFF176 0%,#FBBF24 50%,#F59E0B 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
 }
 #s-play.last-rush-mode .hud-score{
   color:rgba(251,191,36,0.96);
@@ -456,17 +469,19 @@ body{
 /* ── 타이머 = 위험 요소. 정보가 아니라 압박 장치 ── */
 .hud-time-block{display:flex;justify-content:center;padding:2px 0 0;}
 .hud-time-row{
-  display:inline-flex;align-items:center;gap:8px;
+  /* WHY: 도트 제거 후 좌우 패딩 균등 → 숫자 중앙 정렬 */
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
   background:rgba(255,255,255,0.06);
   border:1px solid rgba(103,232,249,0.15);
-  border-radius:24px;padding:5px 24px 5px 16px;
+  border-radius:24px;padding:5px 24px;
   transition:border-color 0.5s,background 0.5s;
 }
 .hud-time-lbl{display:none;}
 .hud-timebar-wrap{display:none;}
 /* WHY: 타이머 크게 — 24px, 위험 요소로서 존재감 */
 .hud-time{
-  font-family:'Orbitron',sans-serif;font-size:24px;font-weight:900;
+  /* WHY: 24→30px — 타이머가 압박 장치로서 존재감 강화 */
+  font-family:'Orbitron',sans-serif;font-size:30px;font-weight:900;
   color:var(--d);min-width:auto;text-align:center;
   flex-shrink:0;letter-spacing:1px;
   transition:color 0.5s,text-shadow 0.5s;
@@ -476,12 +491,8 @@ body{
   flex-shrink:0;padding-bottom:1px;
   transition:color 0.5s;
 }
-/* 도트 — 상태 인디케이터 */
-.hud-time-row::before{
-  content:'';width:8px;height:8px;border-radius:50%;flex-shrink:0;
-  background:var(--d);box-shadow:0 0 6px rgba(103,232,249,0.5);
-  transition:background 0.5s,box-shadow 0.5s;
-}
+/* WHY: 도트 제거 — 숫자만으로 충분 */
+.hud-time-row::before{display:none;}
 
 /* ── 매초 tick: 숫자가 아래서 올라오는 느낌 ── */
 @keyframes timeTick{
@@ -535,11 +546,51 @@ body{
   background:var(--red);box-shadow:0 0 8px rgba(248,113,113,0.6);
 }
 
+/* ── 피버 pill 통합 — 배너 대체 ── */
+/* WHY: 평소 숨김, 피버 시 pill 양쪽에 등장 */
+.fever-pill-left,.fever-pill-right{
+  display:none;
+  font-size:18px;font-weight:900;color:#FBBF24;
+  letter-spacing:2px;white-space:nowrap;
+  opacity:0;transition:opacity 0.3s;
+}
+.fever-pill-left,.fever-pill-right{flex:1;text-align:center;}
+/* 피버 활성 시 — pill 확장 + 노란 강조 */
+.hud-time-row.fever-active .fever-pill-left,
+.hud-time-row.fever-active .fever-pill-right{
+  display:inline;opacity:1;
+}
+/* WHY: 피버 시 pill을 가로 꽉 차게 — inline-flex → flex + width:100% */
+.hud-time-row.fever-active{
+  display:flex;width:100%;justify-content:center;
+  border-color:rgba(251,191,36,0.35);
+  background:rgba(251,191,36,0.08);
+  padding:7px 16px;
+  animation:feverPillPulse 1.8s ease-in-out infinite;
+}
+@keyframes feverPillPulse{
+  0%,100%{background:rgba(251,191,36,0.06);border-color:rgba(251,191,36,0.25);}
+  50%{background:rgba(251,191,36,0.12);border-color:rgba(251,191,36,0.45);}
+}
+.hud-time-row.fever-active::before{
+  background:#FBBF24;box-shadow:0 0 8px rgba(251,191,36,0.6);
+}
+.hud-time-row.fever-active .hud-time{color:#FBBF24;}
+.hud-time-row.fever-active .hud-time-unit{color:rgba(251,191,36,0.5);}
+
+/* WHY: 피버 중 #s-play 배경도 어두운 앰버 pulse — last-rush 빨강과 대칭 */
+#s-play.fever-mode{animation:feverBgPulse 2s ease-in-out infinite;}
+@keyframes feverBgPulse{
+  0%,100%{background:#060810;}
+  50%{background:#0c0a06;}
+}
+
 /* 콤보 스트립 (단계별 색상·크기 차등) */
 .combo-strip{
   /* WHY: 콤보 스트립 20→16px — 보드 세로 공간 확보 */
   height:14px;display:flex;align-items:center;justify-content:center;
   font-size:11px;font-weight:900;color:rgba(167,139,250,0.8);flex-shrink:0;
+  width:100%;text-align:center;
   opacity:0;transition:opacity .2s;
   letter-spacing:0.5px;
 }
@@ -550,21 +601,13 @@ body{
 /* Last Rush 중 콤보 — 골드+더 또렷하게 (opacity만, scale 없음) */
 .last-rush-mode .combo-strip.c3{color:rgba(251,191,36,0.90);opacity:1;}
 .last-rush-mode .combo-strip.c4{color:rgba(251,191,36,0.95);font-size:15px;}
-.last-rush-mode .combo-strip.c5{color:#D4A510;font-size:17px;text-shadow:0 1px 3px rgba(0,0,0,0.6);}
+.last-rush-mode .combo-strip.c5{color:#FBBF24;font-size:17px;text-shadow:0 1px 3px rgba(0,0,0,0.6);}
 /* WHY: 진폭 축소 — 읽힘은 유지, 게임틱한 흔들림 제거 */
 @keyframes comboShake{0%,100%{transform:translateX(0);}30%{transform:translateX(-1px);}70%{transform:translateX(1px);}}
 @keyframes comboMax{0%{transform:scale(0.85);opacity:0;}60%{transform:scale(1.03);}100%{transform:scale(1);opacity:1;}}
 
-/* 피버 배너 */
-/* WHY: top:162→120px + safe-area — 보드 1행 가림 방지. HUD 바로 아래에 배치 */
-.fever-banner{
-  position:absolute;top:calc(env(safe-area-inset-top, 0px) + 120px);left:0;right:0;z-index:20;
-  text-align:center;pointer-events:none;
-  opacity:0;transform:scale(.8) translateY(-6px);
-  transition:opacity .3s,transform .3s;
-  transform-origin:center top;
-}
-.fever-banner.on{opacity:1;transform:scale(1) translateY(0);}
+/* WHY: 기존 absolute 배너 숨김 — pill 통합으로 대체. DOM은 유지(JS 호환) */
+.fever-banner{display:none!important;}
 
 /* 텍스트 전체 래퍼 — 커졌다 작아지는 pulse */
 @keyframes feverPulse{
@@ -793,7 +836,7 @@ body{
   margin-bottom:6px;letter-spacing:-0.3px;
 }
 .quit-popup-sub{
-  font-size:12px;color:rgba(255,255,255,0.38);
+  font-size:12px;color:rgba(255,255,255,0.55);
   margin-bottom:20px;line-height:1.6;
 }
 .quit-popup-btns{display:flex;flex-direction:column;gap:8px;}
@@ -905,7 +948,7 @@ body{
   content:'';position:absolute;top:0;left:10%;right:10%;height:1px;
   background:linear-gradient(90deg,transparent,rgba(251,191,36,0.55),transparent);
 }
-.res-base{font-family:'Inter','Noto Sans KR',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,0.38);margin-bottom:4px;letter-spacing:0.5px;}
+.res-base{font-family:'Inter','Noto Sans KR',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,0.55);margin-bottom:4px;letter-spacing:0.5px;}
 .res-buff{
   display:none;align-items:center;justify-content:center;gap:5px;
   background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.18);
@@ -918,11 +961,12 @@ body{
 /* WHY: 결과 최종 점수만 Orbitron — 게임에서 가장 중요한 숫자 */
 .res-final{
   font-family:'Orbitron',sans-serif;font-size:42px;font-weight:900;
-  color:#D4A810;line-height:1.1;
-  text-shadow:0 2px 6px rgba(0,0,0,0.7);
+  /* WHY: 결과 점수도 밝은 골드 — 어두운 배경에서 선명 */
+  color:#FBBF24;line-height:1.1;
+  text-shadow:0 2px 4px rgba(0,0,0,0.5);
   animation:countReveal .8s cubic-bezier(.25,1,.5,1);
 }
-.res-unit{font-size:16px;color:rgba(251,191,36,0.55);font-weight:700;padding-bottom:3px;}
+.res-unit{font-size:16px;color:rgba(251,191,36,0.75);font-weight:700;padding-bottom:3px;}
 /* 서버 미검증 상태 — OFFLINE/ERROR 시 점수 카드에 적용 */
 .result-score-card.unverified .res-final{color:rgba(255,255,255,0.5);}
 .result-score-card.unverified .res-unit{color:rgba(255,255,255,0.3);}
@@ -938,7 +982,7 @@ body{
   border-radius:14px;padding:11px 14px;margin-bottom:8px;
 }
 .result-hl-title{
-  font-size:9px;font-weight:700;color:rgba(255,255,255,0.28);
+  font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);
   letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;
 }
 .hl-row{
@@ -964,7 +1008,7 @@ body{
 .hl-trigger{
   margin-top:8px;padding-top:8px;
   border-top:1px solid rgba(255,255,255,0.06);
-  font-size:12px;color:rgba(251,191,36,0.55);font-weight:800;letter-spacing:0.2px;
+  font-size:12px;color:rgba(251,191,36,0.75);font-weight:800;letter-spacing:0.2px;
   line-height:1.5;text-align:center;
 }
 .hl-nudge{color:rgba(255,255,255,0.3);font-size:10px;font-weight:700;}
@@ -982,9 +1026,9 @@ body{
 .weekly-best-row,.weekly-this-row{
   display:flex;justify-content:space-between;align-items:center;
 }
-.weekly-lbl{font-size:12px;font-weight:700;color:rgba(255,255,255,0.4);}
+.weekly-lbl{font-size:12px;font-weight:700;color:rgba(255,255,255,0.6);}
 .weekly-val{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;color:var(--white);}
-.weekly-best-row .weekly-val{color:rgba(251,191,36,0.8);}
+.weekly-best-row .weekly-val{color:#FBBF24;}
 /* WHY: 신기록이면 금색 강조 */
 .weekly-this-row.new-record .weekly-val{color:#FBBF24;}
 .weekly-diff{
@@ -992,7 +1036,7 @@ body{
   text-align:center;margin-top:4px;
 }
 .weekly-diff.positive{color:rgba(74,222,128,0.7);}
-.weekly-diff.negative{color:rgba(255,255,255,0.25);}
+.weekly-diff.negative{color:rgba(255,255,255,0.45);}
 .weekly-rank-row{
   display:flex;justify-content:space-between;align-items:center;
   margin-top:4px;padding-top:4px;
@@ -1017,8 +1061,8 @@ body{
 }
 .result-meta-item{flex:1;text-align:center;padding:0 14px;}
 .result-meta-item+.result-meta-item{border-left:1px solid rgba(255,255,255,0.06);}
-.result-meta-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,0.28);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;}
-.result-meta-val{font-family:'Inter','Noto Sans KR',sans-serif;font-size:22px;font-weight:900;color:#D4A510;line-height:1.1;margin-bottom:4px;text-shadow:0 2px 4px rgba(0,0,0,0.7);}
+.result-meta-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;}
+.result-meta-val{font-family:'Inter','Noto Sans KR',sans-serif;font-size:22px;font-weight:900;color:#FBBF24;line-height:1.1;margin-bottom:4px;text-shadow:0 2px 4px rgba(0,0,0,0.7);}
 .result-meta-val.green{color:var(--green);}
 .result-meta-sub{font-size:10px;color:rgba(255,255,255,0.22);font-weight:700;}
 
@@ -1040,10 +1084,12 @@ body{
 .result-actions{display:flex;flex-direction:column;gap:10px;padding:10px 18px 28px;flex-shrink:0;}
 .replay-btn{
   width:100%;padding:18px;border-radius:16px;border:none;
-  background:linear-gradient(135deg,#D4A510,#E0A808,#C89208);color:#0a0800;
-  font-size:17px;font-weight:900;font-family:'Inter','Noto Sans KR',sans-serif;cursor:pointer;
+  /* WHY: 밝은 유리 gradient — 시작/연장 버튼과 동일 체계 */
+  background:linear-gradient(180deg,#FFD54F 0%,#FBBF24 40%,#E8A817 100%);color:#1a1000;
+  font-size:18px;font-weight:900;font-family:'Inter','Noto Sans KR',sans-serif;cursor:pointer;
   position:relative;overflow:hidden;transition:transform 0.1s;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),0 4px 16px rgba(160,110,0,0.3);
+  border:1px solid rgba(255,255,255,0.25);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.4),0 4px 16px rgba(251,191,36,0.3);
   text-shadow:0 1px 2px rgba(60,30,0,0.3);letter-spacing:0.3px;
 }
 .replay-btn:active{transform:scale(0.97);}
@@ -1051,9 +1097,13 @@ body{
 .replay-btn::after{content:none;}
 /* 3군: back-btn — 완전 침묵 */
 .back-btn{
-  width:100%;padding:10px;border-radius:12px;background:transparent;
-  border:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.36);
-  font-size:12px;font-weight:700;font-family:'Inter','Noto Sans KR',sans-serif;cursor:pointer;
+  /* WHY: 로비 버튼도 밝게 — 유리 카드 느낌 */
+  width:100%;padding:12px;border-radius:14px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  color:rgba(255,255,255,0.65);
+  font-size:13px;font-weight:700;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.08);font-family:'Inter','Noto Sans KR',sans-serif;cursor:pointer;
   transition:opacity .2s;
 }
 .back-btn:active{opacity:0.6;}
@@ -1063,7 +1113,7 @@ body{
 .contrib-title{font-size:9px;font-weight:700;color:rgba(255,255,255,0.26);letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;}
 .contrib-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:var(--white);margin-bottom:4px;}
 .contrib-improve{font-size:13px;font-weight:900;color:var(--green);}
-.contrib-sub{font-size:10px;color:rgba(255,255,255,0.35);}
+.contrib-sub{font-size:10px;color:rgba(255,255,255,0.55);}
 
 /* 파티클 */
 .ptcl{
@@ -1276,7 +1326,7 @@ svg.ov-icon{
 }
 /* 현재 점수 라벨 */
 .popup-reward-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;}
-.popup-reward-lbl{font-size:11px;font-weight:700;color:rgba(255,255,255,0.38);letter-spacing:0.3px;}
+.popup-reward-lbl{font-size:11px;font-weight:700;color:rgba(255,255,255,0.55);letter-spacing:0.3px;}
 /* 현재 점수 값 — 크고 흰색 */
 .popup-reward-val{
   color:var(--white);font-weight:900;
@@ -1353,7 +1403,7 @@ svg.ov-icon{
   content:'';position:absolute;inset:-4px;
   border-radius:50%;
   border:2px solid transparent;
-  border-top-color:rgba(251,191,36,0.8);
+  border-top-color:#FBBF24;
   animation:cdSpin 1.2s linear infinite;
 }
 @keyframes cdSpin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
@@ -1408,37 +1458,45 @@ svg.ov-icon{
 }
 .ext-sub{font-size:12px;color:rgba(255,255,255,0.4);line-height:1.6;}
 .ext-btns{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+/* WHY: 유리질감 — 상단 하이라이트 inset + 반투명 border로 깊이감 */
 .ext-btn{
-  width:100%;padding:15px 16px;border-radius:16px;border:none;
-  display:flex;align-items:center;gap:12px;
-  font-size:14px;font-weight:900;font-family:'Inter','Noto Sans KR',sans-serif;
+  width:100%;padding:15px 20px;border-radius:16px;border:none;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  font-size:15px;font-weight:900;font-family:'Inter','Noto Sans KR',sans-serif;
   cursor:pointer;transition:transform 0.1s;position:relative;overflow:hidden;
 }
 .ext-btn:active{transform:scale(0.97);}
-/* WHY: sweep 제거 */
 .ext-btn::after{content:none;}
 .ext-btn-ico{font-size:20px;flex-shrink:0;}
-.ext-btn-text{flex:1;text-align:left;}
+.ext-btn-text{text-align:center;}
+/* WHY: 다이아 버튼 — 밝은 골드 gradient + 유리 상단 하이라이트 */
 .ext-btn-dia{
-  background:linear-gradient(135deg,#FBBF24,#F59E0B);color:#000;
-  box-shadow:0 2px 12px rgba(251,191,36,0.25);
+  background:linear-gradient(180deg,#FFD54F 0%,#FBBF24 40%,#E8A817 100%);
+  color:#1a1000;
+  border:1px solid rgba(255,255,255,0.25);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.4),0 4px 16px rgba(251,191,36,0.3);
 }
+/* WHY: 광고 버튼 — 밝은 보라 gradient + 유리 상단 하이라이트 */
 .ext-btn-ad{
-  background:linear-gradient(135deg,#8B5CF6,#6D28D9);color:#fff;
-  box-shadow:0 2px 12px rgba(139,92,246,0.25);
+  background:linear-gradient(180deg,#A78BFA 0%,#8B5CF6 40%,#7C3AED 100%);
+  color:#fff;
+  border:1px solid rgba(255,255,255,0.2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.3),0 4px 16px rgba(139,92,246,0.3);
 }
+/* WHY: 결과 보기 — 유리 카드 느낌 */
 .ext-skip{
   display:block;width:100%;
-  background:rgba(255,255,255,0.05);
-  border:1px solid rgba(255,255,255,0.1);
-  border-radius:12px;
-  color:rgba(255,255,255,0.55);
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:14px;
+  color:rgba(255,255,255,0.65);
   font-size:13px;font-weight:700;font-family:'Inter','Noto Sans KR',sans-serif;
-  cursor:pointer;padding:11px 20px;
+  cursor:pointer;padding:12px 20px;text-align:center;
   letter-spacing:0.3px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.08);
   transition:background .2s,color .2s;
 }
-.ext-skip:active{background:rgba(255,255,255,0.09);color:rgba(255,255,255,0.75);}
+.ext-skip:active{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);}
 .popup-btn-used{
   opacity:.35;pointer-events:none;
   background:rgba(255,255,255,0.06)!important;color:var(--muted)!important;
@@ -1548,7 +1606,7 @@ svg.ov-icon{
     </div>
     <!-- 버튼 고정 영역 — 스크롤과 분리 -->
     <div class="lobby-footer">
-      <button class="start-btn" onclick="startGame()">➔ 퍼즐 시작하기</button>
+      <button class="start-btn" onclick="startGame()">퍼즐 시작하기</button>
     </div>
   </div>
 </div>
@@ -1579,11 +1637,11 @@ svg.ov-icon{
       <div class="hud-score" id="h-score">0</div>
     </div>
     <div class="hud-time-block">
-      <div class="hud-time-row">
-        <span class="hud-time-lbl">TIME</span>
-        <div class="hud-timebar-wrap"><div class="hud-timebar-fill" id="h-timebar-fill"></div></div>
+      <!-- WHY: 피버 좌/우 텍스트를 pill 안에 배치 — 배너 absolute 제거 -->
+      <div class="hud-time-row" id="hud-time-row">
+        <span class="fever-pill-left" id="fever-pill-left">🔥 FEVER</span>
         <span class="hud-time" id="h-time">60</span>
-        <span class="hud-time-unit">s</span>
+        <span class="fever-pill-right" id="fever-pill-right">T I M E 🔥</span>
       </div>
     </div>
     <!-- 이벤트 배너 제거됨 -->
@@ -3126,6 +3184,8 @@ function startFever(){
   AudioSys.setFever(true);  // fever 레이어 fade in
   document.getElementById('s-play').classList.add('fever-mode');
   const b=document.getElementById('fever-banner');b.classList.add('on');
+  /* WHY: pill 안에 피버 좌우 텍스트 활성화 — 배너 대체 */
+  document.getElementById('hud-time-row').classList.add('fever-active');
   document.getElementById('fever-t').textContent=FG_FEVER_DUR;
   // 진입 플래시 + 파티클 버스트
   const fl=document.getElementById('fever-flash');
@@ -3139,6 +3199,8 @@ function startFever(){
     if(feverLeft<=0){isFever=false;clearInterval(feverTmr);
       document.getElementById('s-play').classList.remove('fever-mode');
       b.classList.remove('on');
+      /* WHY: pill 피버 해제 */
+      document.getElementById('hud-time-row').classList.remove('fever-active');
       AudioSys.setFever(false);perfTag('fever_end');
     }
   },1000);
@@ -3243,12 +3305,19 @@ function startTimer(){
     // 5초 이하 — urgent 전환
     if(timeLeft<=5 && timeLeft>0) exitLastRushVisual();
 
-    // 종료
+    /* WHY: 연쇄 폭발 중이면 종료를 지연 — 블록 터지는 중에 게임오버 뜨는 버그 방지 */
     if(timeLeft<=0){
       clearInterval(gameTimer);
       clearLastRushVisual();
-      if(usedDiamond&&usedAd){forceEnd();}
-      else{updateExtPopup();document.getElementById('ext-overlay').classList.add('on');}
+      const doEnd=()=>{
+        if(usedDiamond&&usedAd){forceEnd();}
+        else{updateExtPopup();document.getElementById('ext-overlay').classList.add('on');}
+      };
+      if(isAnimating){
+        const waitAnim=setInterval(()=>{
+          if(!isAnimating){clearInterval(waitAnim);doEnd();}
+        },50);
+      }else{doEnd();}
     }
   },1000);
 }
@@ -3258,12 +3327,12 @@ function updateExtPopup(){
   el.innerHTML=
     `<div class="popup-reward-row">
        <span class="popup-reward-lbl">현재 점수</span>
-       <span class="popup-reward-val">${score.toLocaleString()}<span style="font-size:11px;color:rgba(255,255,255,0.35);font-family:'Inter','Noto Sans KR',sans-serif;font-weight:700;margin-left:3px">점</span></span>
+       <span class="popup-reward-val">${score.toLocaleString()}<span style="font-size:11px;color:rgba(255,255,255,0.55);font-family:'Inter','Noto Sans KR',sans-serif;font-weight:700;margin-left:3px">점</span></span>
      </div>
      <div class="popup-reward-divider"></div>
      <div class="popup-reward-row">
        <span class="popup-reward-lbl">연장 시 예상</span>
-       <span class="popup-reward-val est">~${(score+estAdd).toLocaleString()}<span style="font-size:12px;color:rgba(251,191,36,0.5);font-family:'Inter','Noto Sans KR',sans-serif;font-weight:700;margin-left:3px">점</span></span>
+       <span class="popup-reward-val est">~${(score+estAdd).toLocaleString()}<span style="font-size:12px;color:#FBBF24;font-family:'Inter','Noto Sans KR',sans-serif;font-weight:700;margin-left:3px">점</span></span>
      </div>`;
   // 버튼 1회 사용 후 비활성화
   const bd=document.getElementById('btn-diamond');
@@ -3891,6 +3960,7 @@ function startGame(){
   updateHUD();
   document.getElementById('s-play').classList.remove('fever-mode','last-rush-mode','urgent-bg','perf-low');
   document.getElementById('fever-banner').classList.remove('on');
+  document.getElementById('hud-time-row').classList.remove('fever-active');
   document.getElementById('combo-strip').className='combo-strip';
   document.getElementById('fever-gauge').className='fever-gauge';
   document.getElementById('fever-flash').classList.remove('on');
@@ -3918,6 +3988,8 @@ function goLobby(){
   sp.classList.remove('fever-mode','last-rush-mode','urgent-bg','golden-mode','rush-mode');
   document.getElementById('uf').classList.remove('on','last-rush');
   document.getElementById('h-time').classList.remove('urgent','last-rush','tick');
+  /* WHY: pill 피버/상태 클래스 잔상 전부 정리 */
+  document.getElementById('hud-time-row').classList.remove('fever-active','time-warn','time-rush','time-danger');
   document.getElementById('gameover').classList.remove('on');
   document.getElementById('ext-overlay').classList.remove('on');
   const ri=document.querySelector('.result-inner');
@@ -4102,8 +4174,8 @@ const AudioSys=(()=>{
     setFever(on){
       if(!_ctx)return;
       if(on){
-        // 베이스 살짝 줄이고 피버 레이어 시작
-        _fade(_bGain,0.35,200);
+        /* WHY: 피버 중 base 완전 뮤트 — 피버 전용 BGM만 들리게 */
+        _fade(_bGain,0,200);
         _fade(_fGain,0.88,150);
         // 피버 전용 스케줄러 독립 시작
         _fStep=0; _fNextTime=_ctx.currentTime+0.05;
