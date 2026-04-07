@@ -172,6 +172,28 @@ body{
   90%{transform:translate3d(2px,-1px,0);}
 }
 .phone.shake{animation:screenShake .32s ease;}
+/* WHY: 대형 연쇄/특수연계 — 화면 전체 보상 반응 3단계. transform only → GPU safe */
+.phone.impact-light{animation:impactLight .18s ease;}
+.phone.impact-mid{animation:impactMid .22s ease;}
+.phone.impact-heavy{animation:impactHeavy .28s ease;}
+@keyframes impactLight{
+  0%{transform:scale(1);}
+  40%{transform:scale(0.992);}
+  100%{transform:scale(1);}
+}
+@keyframes impactMid{
+  0%{transform:scale(1);}
+  30%{transform:scale(0.988) translate3d(0,1px,0);}
+  60%{transform:scale(1.003);}
+  100%{transform:scale(1);}
+}
+@keyframes impactHeavy{
+  0%{transform:scale(1);}
+  20%{transform:scale(0.985) translate3d(-1px,1px,0);}
+  45%{transform:scale(1.005) translate3d(1px,0,0);}
+  70%{transform:scale(0.998);}
+  100%{transform:scale(1);}
+}
 
 /* ── 화면 공통 ── */
 .screen{display:none;flex:1;flex-direction:column;overflow:hidden;position:relative;}
@@ -334,15 +356,31 @@ body{
    판수/콤보 → 스코어 → 타임바+시간
    겹침 없음 · TIME 크고 선명하게
 ════════════════════════════════════ */
+/* WHY: 기본 배경 #060810. last-rush/urgent는 background 직접 애니메이션 */
 #s-play{background:#060810;touch-action:none;user-select:none;}
-#s-play.fever-mode{background:#060810;} /* 배경 고정, fever 분위기는 board::after ambient로 */
+#s-play.fever-mode{background:#060810;}
+/* 10~6초: 배경 전체가 어두운 붉은톤 ↔ 옅은 백색틴트로 느린 pulse */
+#s-play.last-rush-mode{animation:lrBgFull 2.4s ease-in-out infinite;}
+@keyframes lrBgFull{
+  0%,100%{background:#060810;}
+  50%{background:#120808;}
+}
+/* 5~1초: 더 빠르고 강한 붉은+창백 pulse */
+#s-play.urgent-bg{animation:urgBgFull 1.2s ease-in-out infinite;}
+@keyframes urgBgFull{
+  0%,100%{background:#0a0608;}
+  35%{background:#1a0808;}
+  70%{background:#0e0a0c;}
+}
 
 /* ── HUD 전체 래퍼 ── */
-/* WHY: HUD 상하 패딩 축소 — 세로 공간을 보드에 양보 */
+/* WHY: HUD를 보드에서 시각적으로 분리 — 반투명 카드 느낌. blur 없이 background만 */
+/* WHY: 상단 여백 4→12px — 점수가 상단에 붙어 답답한 느낌 해소 */
 .hud-wrap{
-  padding:2px 16px 0px;flex-shrink:0;
+  padding:12px 16px 4px;flex-shrink:0;
   position:relative;z-index:10;
-  background:linear-gradient(to bottom,#060810 85%,rgba(6,8,16,0));
+  background:rgba(8,10,20,0.85);
+  border-bottom:1px solid rgba(255,255,255,0.06);
 }
 
 /* ── 상단 칩 바: 판수/콤보 — 3순위, 존재감 낮춤 ── */
@@ -351,29 +389,32 @@ body{
   margin-bottom:0px;
 }
 .hud-chip{display:flex;align-items:baseline;gap:4px;}
+/* WHY: 판수/콤보를 더 조용하게 — 점수/시간에 시선 집중 */
 .hud-chip-lbl{
-  font-size:8px;font-weight:700;color:rgba(255,255,255,0.20);
+  font-size:7px;font-weight:700;color:rgba(255,255,255,0.15);
   letter-spacing:1px;text-transform:uppercase;
 }
 .hud-chip-val{
-  font-family:'Inter','Noto Sans KR',sans-serif;font-size:12px;font-weight:700;
-  color:rgba(255,255,255,0.42);
+  font-family:'Inter','Noto Sans KR',sans-serif;font-size:11px;font-weight:700;
+  color:rgba(255,255,255,0.32);
 }
 
 /* ── 스코어 블록 — 1순위 ── */
 /* WHY: 스코어-타임 간격 축소 → 보드 세로 확대 */
-.hud-score-block{text-align:center;margin-bottom:1px;}
-.hud-score-lbl{
-  font-size:7px;font-weight:700;color:rgba(255,255,255,0.16);
-  letter-spacing:1.5px;text-transform:uppercase;margin-bottom:0;
-}
+/* WHY: 점수↔시간 pill 사이 여백 확보 */
+/* WHY: 점수↔시간 pill 간격 4→10px — 숨 쉴 공간 */
+.hud-score-block{text-align:center;margin-bottom:10px;}
+/* WHY: 이미지 레퍼런스 — SCORE 라벨 숨김, 숫자만 표시 */
+.hud-score-lbl{display:none;}
 /* WHY: 점수만 Orbitron 유지 — 게임의 단 하나 핵심 숫자 */
+/* WHY: 이미지 레퍼런스 — 골드 세리프 대형 점수. 묵직한 금색+그림자 */
 .hud-score{
-  font-family:'Orbitron',sans-serif;font-size:46px;font-weight:900;
-  color:var(--white);line-height:1.0;letter-spacing:-1px;
+  font-family:'Orbitron',sans-serif;font-size:52px;font-weight:900;
+  color:#D4A520;line-height:1.0;letter-spacing:-1px;
+  min-height:54px;display:flex;align-items:center;justify-content:center;
   will-change:transform,opacity;
-  white-space:nowrap;          /* 999,999 단위에서 줄바꿈 원천 차단 */
-  text-shadow:0 2px 0 rgba(0,0,0,0.45),0 0 20px rgba(255,255,255,0.06);
+  white-space:nowrap;
+  text-shadow:0 2px 4px rgba(0,0,0,0.7),0 0 12px rgba(212,165,32,0.15);
 }
 #s-play.fever-mode .hud-score{
   color:var(--g);
@@ -410,47 +451,87 @@ body{
 .hud-score.bump-high {animation:scoreSlideHigh  .28s cubic-bezier(0.22,1,0.36,1) forwards;}
 .hud-score.bump-fever{animation:scoreSlideFever .30s cubic-bezier(0.22,1,0.36,1) forwards;}
 
-/* ── 타임 블록 — 2순위 ── */
-.hud-time-block{padding:0 1px;}
-.hud-time-row{display:flex;align-items:center;gap:6px;}
-.hud-time-lbl{
-  font-size:7px;font-weight:700;color:rgba(255,255,255,0.26);
-  letter-spacing:1.5px;text-transform:uppercase;flex-shrink:0;
+/* ── 타이머 = 위험 요소. 정보가 아니라 압박 장치 ── */
+.hud-time-block{display:flex;justify-content:center;padding:2px 0 0;}
+.hud-time-row{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(103,232,249,0.15);
+  border-radius:24px;padding:5px 24px 5px 16px;
+  transition:border-color 0.5s,background 0.5s;
 }
-/* 타임바 — 4px, 채움 색 대비 최대화 */
-.hud-timebar-wrap{
-  flex:1;height:4px;background:rgba(255,255,255,0.07);
-  border-radius:4px;overflow:hidden;
-}
-.hud-timebar-fill{
-  height:100%;width:100%;border-radius:4px;
-  background:var(--d);
-  box-shadow:0 0 6px rgba(103,232,249,0.35);
-  transition:width 0.92s linear;
-}
-/* 타임 숫자 */
+.hud-time-lbl{display:none;}
+.hud-timebar-wrap{display:none;}
+/* WHY: 타이머 크게 — 24px, 위험 요소로서 존재감 */
 .hud-time{
-  /* WHY: 타임 30→26px — HUD 세로 공간 절약, 보드 확대 */
-  font-family:'Inter','Noto Sans KR',sans-serif;font-size:22px;font-weight:900;
-  color:rgba(255,255,255,0.98);min-width:34px;text-align:right;
-  flex-shrink:0;letter-spacing:-0.5px;
-  text-shadow:0 1px 0 rgba(0,0,0,0.4);
+  font-family:'Orbitron',sans-serif;font-size:24px;font-weight:900;
+  color:var(--d);min-width:auto;text-align:center;
+  flex-shrink:0;letter-spacing:1px;
+  transition:color 0.5s,text-shadow 0.5s;
 }
 .hud-time-unit{
-  font-size:9px;font-weight:700;color:rgba(255,255,255,0.26);
-  letter-spacing:0.5px;flex-shrink:0;padding-bottom:2px;
+  font-size:9px;font-weight:700;color:rgba(103,232,249,0.4);
+  flex-shrink:0;padding-bottom:1px;
+  transition:color 0.5s;
 }
-/* Toss 스타일 타임 틱 */
-@keyframes timeTick{
-  0%  {opacity:0.4;transform:translateY(4px);}
-  70% {opacity:1;  transform:translateY(-0.5px);}
-  100%{opacity:1;  transform:translateY(0);}
+/* 도트 — 상태 인디케이터 */
+.hud-time-row::before{
+  content:'';width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  background:var(--d);box-shadow:0 0 6px rgba(103,232,249,0.5);
+  transition:background 0.5s,box-shadow 0.5s;
 }
-.hud-time.tick{animation:timeTick .28s cubic-bezier(0.22,1,0.36,1);}
 
-/* urgent / last-rush */
-.hud-time.last-rush{color:#FBBF24;animation:lastRushPulse 1.2s ease-in-out infinite;}
-.hud-time.urgent   {color:var(--red);animation:tick .45s ease-in-out infinite;}
+/* ── 매초 tick: 숫자가 아래서 올라오는 느낌 ── */
+@keyframes timeTick{
+  0%  {opacity:0.3;transform:translateY(6px) scale(0.95);}
+  60% {opacity:1;  transform:translateY(-1px) scale(1.02);}
+  100%{opacity:1;  transform:translateY(0) scale(1);}
+}
+.hud-time.tick{animation:timeTick .3s cubic-bezier(0.22,1,0.36,1);}
+
+/* ── 30초 이하: 청 → 노랑 전환 (CSS만, JS 불필요) ── */
+/* JS updateHUD에서 timeLeft<=30이면 .hud-time-row에 'time-warn' 추가 */
+.hud-time-row.time-warn{
+  border-color:rgba(251,191,36,0.2);
+  background:rgba(251,191,36,0.04);
+}
+.hud-time-row.time-warn::before{
+  background:#FBBF24;box-shadow:0 0 6px rgba(251,191,36,0.5);
+}
+.hud-time-row.time-warn .hud-time{
+  color:#FBBF24;
+}
+.hud-time-row.time-warn .hud-time-unit{color:rgba(251,191,36,0.5);}
+
+/* ── last-rush (10~6초): 노랑 강화 + pulse — :has() 제거, 클래스 기반 ── */
+.hud-time.last-rush{color:#FBBF24;animation:lastRushPulse 1s ease-in-out infinite;}
+.hud-time.last-rush ~ .hud-time-unit{color:rgba(251,191,36,0.5);}
+.hud-time-row.time-rush{
+  border-color:rgba(251,191,36,0.3);
+  background:rgba(251,191,36,0.06);
+}
+.hud-time-row.time-rush::before{
+  background:#FBBF24;box-shadow:0 0 8px rgba(251,191,36,0.6);
+}
+
+/* ── urgent (5초 이하): 빨강 + scale pulse — :has() 제거 ── */
+.hud-time.urgent{color:var(--red);animation:urgentPulse .55s ease-in-out infinite;}
+@keyframes urgentPulse{
+  0%,100%{opacity:1;transform:scale(1);}
+  50%{opacity:0.65;transform:scale(1.04);}
+}
+.hud-time-row.time-danger{
+  border-color:rgba(248,113,113,0.4);
+  background:rgba(248,113,113,0.08);
+  animation:pillDanger .55s ease-in-out infinite;
+}
+@keyframes pillDanger{
+  0%,100%{border-color:rgba(248,113,113,0.4);}
+  50%{border-color:rgba(248,113,113,0.15);}
+}
+.hud-time-row.time-danger::before{
+  background:var(--red);box-shadow:0 0 8px rgba(248,113,113,0.6);
+}
 
 /* 콤보 스트립 (단계별 색상·크기 차등) */
 .combo-strip{
@@ -612,7 +693,22 @@ body{
 }
 .cell.exploding{animation:explodeCell .18s ease-in forwards;pointer-events:none;}
 /* WHY: 4매치+ 직전 짧은 밝기 상승 — 일반 3매치와 즉시 구분 */
-.cell.match-flash{animation:matchFlash .16s ease!important;}
+/* WHY: match-flash → pre-pop으로 통합. 터지기 직전 압력감. 3단계 강도 차등 */
+.cell.pre-pop{animation:prePop .1s cubic-bezier(0.22,1,0.36,1) forwards;}
+.cell.pre-pop-strong{animation:prePopStrong .12s cubic-bezier(0.22,1,0.36,1) forwards;}
+.cell.pre-pop-special{animation:prePopSpecial .14s cubic-bezier(0.22,1,0.36,1) forwards;}
+@keyframes prePop{
+  0%{transform:scale(1);}
+  100%{transform:scale(1.06);box-shadow:inset 0 0 4px rgba(255,255,255,0.15);}
+}
+@keyframes prePopStrong{
+  0%{transform:scale(1);}
+  100%{transform:scale(1.09);box-shadow:inset 0 0 6px rgba(255,255,255,0.22);}
+}
+@keyframes prePopSpecial{
+  0%{transform:scale(1);}
+  100%{transform:scale(1.12);box-shadow:inset 0 0 8px rgba(255,255,255,0.3);}
+}
 @keyframes matchFlash{0%{transform:scale(1.12);opacity:1;}100%{transform:scale(1);opacity:1;}}
 
 /* 파트1-3: 스왑/실패 transition은 JS에서 직접 style 조작 */
@@ -639,9 +735,18 @@ body{
   0%,100%{opacity:1;}
   50%{opacity:0.58;}
 }
-/* WHY: .20s→.25s — snap은 유지하되 과하지 않게 */
+/* WHY: last-rush tick — 살짝 더 강조 */
 .last-rush-mode .hud-time.tick{
   animation:timeTick .25s cubic-bezier(0.22,1,0.36,1);
+}
+/* WHY: urgent tick — 더 빠르고 강한 스냅. scale 1.05까지만 (싸구려 방지) */
+.hud-time.urgent.tick{
+  animation:urgentTick .22s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes urgentTick{
+  0%  {opacity:0.2;transform:translateY(8px) scale(0.93);}
+  55% {opacity:1;  transform:translateY(-2px) scale(1.05);}
+  100%{opacity:1;  transform:translateY(0) scale(1);}
 }
 /* WHY: 1.6s→1.9s — 느린 호흡으로 고급스러운 앰버 압력감 */
 .urgent-frame.last-rush{
@@ -653,6 +758,7 @@ body{
   0%,100%{opacity:0.55;}
   50%{opacity:0.15;}
 }
+/* ::before 오버레이 제거 — 배경 pulse는 #s-play background 직접 애니메이션으로 처리 */
 
 /* WHY: 하단 패딩 축소 — 보드 세로 공간 확보 */
 .play-bottom{padding:2px 16px 4px;flex-shrink:0;display:flex;gap:8px;align-items:center;}
@@ -772,17 +878,18 @@ body{
 /* 순차 등장 */
 .result-inner.show .result-score-card{animation:resCardIn .34s cubic-bezier(.25,1,.5,1) .05s both;}
 .result-inner.show .result-hl-card  {animation:resCardIn .34s cubic-bezier(.25,1,.5,1) .12s both;}
-.result-inner.show .result-meta-card{animation:resCardIn .34s cubic-bezier(.25,1,.5,1) .19s both;}
-.result-inner.show .result-actions  {animation:resCardIn .30s cubic-bezier(.25,1,.5,1) .25s both;}
+.result-inner.show .result-meta-card{animation:resCardIn .34s cubic-bezier(.25,1,.5,1) .22s both;}
+.result-inner.show .result-actions  {animation:resCardIn .30s cubic-bezier(.25,1,.5,1) .28s both;}
 @keyframes resCardIn{
   0%  {opacity:0;transform:translateY(6px);}
   100%{opacity:1;transform:translateY(0);}
 }
 
+/* WHY: 결과 제목 — 감정형으로 동적 변경 가능하게 크기/색 강화 */
 .result-title{
-  font-size:9px;font-weight:700;text-align:center;
-  color:rgba(255,255,255,0.25);letter-spacing:1.5px;text-transform:uppercase;
-  margin-bottom:10px;
+  font-size:14px;font-weight:900;text-align:center;
+  color:rgba(251,191,36,0.7);letter-spacing:0.5px;
+  margin-bottom:10px;line-height:1.4;
 }
 .result-score-card{
   background:linear-gradient(165deg,#0a1020 0%,#060c18 100%);
@@ -849,14 +956,45 @@ body{
   color:var(--g);
 }
 /* 감정 트리거 + 넛지 */
+/* WHY: 트리거 → replay 직전 위치. 감정적 한 줄이 replay 동기를 만듦 */
 .hl-trigger{
-  margin-top:7px;padding-top:7px;
-  border-top:1px solid rgba(255,255,255,0.04);
-  font-size:10px;color:rgba(255,255,255,0.24);font-weight:700;letter-spacing:0.2px;
-  line-height:1.6;
+  margin-top:8px;padding-top:8px;
+  border-top:1px solid rgba(255,255,255,0.06);
+  font-size:12px;color:rgba(251,191,36,0.55);font-weight:800;letter-spacing:0.2px;
+  line-height:1.5;text-align:center;
 }
-/* WHY: 넛지는 트리거보다 더 조용하게 — 과장 없이 "다음 판 동기" 제시 */
-.hl-nudge{color:rgba(251,191,36,0.35);font-size:9px;}
+.hl-nudge{color:rgba(255,255,255,0.3);font-size:10px;font-weight:700;}
+
+/* ── 주간 베스트 비교 카드 ── */
+.result-weekly-card{
+  background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.12);
+  border-radius:14px;padding:12px 16px;margin-bottom:8px;
+}
+.weekly-title{
+  font-size:10px;font-weight:700;color:rgba(251,191,36,0.5);
+  letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;
+}
+.weekly-body{display:flex;flex-direction:column;gap:4px;}
+.weekly-best-row,.weekly-this-row{
+  display:flex;justify-content:space-between;align-items:center;
+}
+.weekly-lbl{font-size:12px;font-weight:700;color:rgba(255,255,255,0.4);}
+.weekly-val{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;color:var(--white);}
+.weekly-best-row .weekly-val{color:rgba(251,191,36,0.8);}
+/* WHY: 신기록이면 금색 강조 */
+.weekly-this-row.new-record .weekly-val{color:#FBBF24;}
+.weekly-diff{
+  font-size:11px;font-weight:700;color:rgba(255,255,255,0.3);
+  text-align:center;margin-top:4px;
+}
+.weekly-diff.positive{color:rgba(74,222,128,0.7);}
+.weekly-diff.negative{color:rgba(255,255,255,0.25);}
+.weekly-rank{
+  font-size:10px;font-weight:700;color:rgba(251,191,36,0.35);
+  text-align:center;margin-top:2px;
+}
+/* 순차 등장에 추가 */
+.result-inner.show .result-weekly-card{animation:resCardIn .34s cubic-bezier(.25,1,.5,1) .16s both;}
 
 /* ── 2군: 메타 카드 ── */
 .result-meta-card{
@@ -872,30 +1010,28 @@ body{
 .result-meta-sub{font-size:10px;color:rgba(255,255,255,0.22);font-weight:700;}
 
 /* ── 2군: 길드 CTA — 사파이어 골드 배너 ── */
+/* WHY: 길드 CTA 축소 — 점수/하이라이트/replay에 시선 집중 */
 .result-guild-cta{
-  background:linear-gradient(135deg,rgba(10,14,28,0.85),rgba(8,12,22,0.92));
-  border:1px solid rgba(251,191,36,0.22);
-  border-radius:14px;padding:18px 20px;margin-bottom:10px;text-align:center;
-  box-shadow:inset 0 1px 0 rgba(251,191,36,0.15);
+  background:rgba(10,14,28,0.6);
+  border:1px solid rgba(251,191,36,0.12);
+  border-radius:10px;padding:10px 16px;margin-bottom:6px;text-align:center;
 }
-/* WHY: 길드 CTA 텍스트 절제 — 너무 강조하면 결과창이 시끄러움 */
 .result-guild-cta-text{
-  font-size:12px;font-weight:600;
-  color:rgba(212,165,16,0.65);
-  letter-spacing:0.2px;line-height:1.5;
+  font-size:11px;font-weight:700;
+  color:rgba(212,165,16,0.45);
+  letter-spacing:0.2px;
 }
 
 /* ── CTA 버튼 ── */
-.result-actions{display:flex;flex-direction:column;gap:8px;padding:8px 18px 24px;flex-shrink:0;}
+/* WHY: replay를 가장 크고 강하게 — 시선 이동 없이 바로 누르게 */
+.result-actions{display:flex;flex-direction:column;gap:10px;padding:10px 18px 28px;flex-shrink:0;}
 .replay-btn{
-  /* WHY: replay CTA 톤다운 — start-btn과 동일 체계 */
-  width:100%;padding:16px;border-radius:14px;border:none;
-  background:linear-gradient(135deg,#C8A208,#D4920A,#B87806);color:#0a0800;
-  font-size:15px;font-weight:900;font-family:'Inter','Noto Sans KR',sans-serif;cursor:pointer;
+  width:100%;padding:18px;border-radius:16px;border:none;
+  background:linear-gradient(135deg,#D4A510,#E0A808,#C89208);color:#0a0800;
+  font-size:17px;font-weight:900;font-family:'Inter','Noto Sans KR',sans-serif;cursor:pointer;
   position:relative;overflow:hidden;transition:transform 0.1s;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.18),0 3px 12px rgba(160,110,0,0.25);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),0 4px 16px rgba(160,110,0,0.3);
   text-shadow:0 1px 2px rgba(60,30,0,0.3);letter-spacing:0.3px;
-  /* WHY: replayPulse 삭제 — 상시 infinite animation 1개 제거 */
 }
 .replay-btn:active{transform:scale(0.97);}
 /* WHY: sweep 제거 */
@@ -924,61 +1060,24 @@ body{
 @keyframes ptclFly{0%{transform:translate(0,0) scale(1);opacity:0.65;}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0;}}
 
 /* WHY: 특수블록 — 중앙 심볼 + 은은한 오로라 glow. box-shadow only, filter 없음 */
+/* WHY: aurora infinite 6종 제거 → 정적 테두리만. spawn 시 1회 플래시는 ov-spawn으로 처리 */
 .cell.has-gold{
-  box-shadow:inset 0 0 0 2px rgba(212,165,16,0.5),
-    0 0 8px rgba(212,165,16,0.35),0 0 18px rgba(245,158,11,0.15)!important;
-  animation:auroraGold 2.5s ease-in-out infinite!important;
+  box-shadow:inset 0 0 0 2px rgba(212,165,16,0.5),0 0 6px rgba(212,165,16,0.3)!important;
 }
 .cell.has-clock{
-  box-shadow:inset 0 0 0 2px rgba(20,184,166,0.45),
-    0 0 8px rgba(20,184,166,0.3),0 0 18px rgba(6,182,212,0.12)!important;
-  animation:auroraClock 2.5s ease-in-out infinite!important;
+  box-shadow:inset 0 0 0 2px rgba(20,184,166,0.45),0 0 6px rgba(20,184,166,0.25)!important;
 }
 .cell.has-star{
-  box-shadow:inset 0 0 0 2px rgba(124,58,237,0.45),
-    0 0 8px rgba(124,58,237,0.3),0 0 18px rgba(167,139,250,0.15)!important;
-  animation:auroraStar 2.5s ease-in-out infinite!important;
+  box-shadow:inset 0 0 0 2px rgba(124,58,237,0.45),0 0 6px rgba(124,58,237,0.25)!important;
 }
-/* WHY: 오로라 — box-shadow 반경만 호흡. transform/filter 없이 GPU 안전 */
-@keyframes auroraGold{
-  0%,100%{box-shadow:inset 0 0 0 2px rgba(212,165,16,0.5),0 0 8px rgba(212,165,16,0.35),0 0 18px rgba(245,158,11,0.15);}
-  50%{box-shadow:inset 0 0 0 2px rgba(212,165,16,0.6),0 0 12px rgba(212,165,16,0.45),0 0 24px rgba(245,158,11,0.2);}
-}
-@keyframes auroraClock{
-  0%,100%{box-shadow:inset 0 0 0 2px rgba(20,184,166,0.45),0 0 8px rgba(20,184,166,0.3),0 0 18px rgba(6,182,212,0.12);}
-  50%{box-shadow:inset 0 0 0 2px rgba(20,184,166,0.55),0 0 12px rgba(20,184,166,0.4),0 0 24px rgba(6,182,212,0.18);}
-}
-@keyframes auroraStar{
-  0%,100%{box-shadow:inset 0 0 0 2px rgba(124,58,237,0.45),0 0 8px rgba(124,58,237,0.3),0 0 18px rgba(167,139,250,0.15);}
-  50%{box-shadow:inset 0 0 0 2px rgba(124,58,237,0.55),0 0 12px rgba(124,58,237,0.4),0 0 24px rgba(167,139,250,0.22);}
-}
-/* WHY: 번개/복제/연쇄 — 각 속성 톤의 절제된 오로라 */
 .cell.has-lightning{
-  box-shadow:inset 0 0 0 2px rgba(251,191,36,0.5),
-    0 0 8px rgba(251,191,36,0.35),0 0 18px rgba(217,119,6,0.15)!important;
-  animation:auroraLightning 2.5s ease-in-out infinite!important;
+  box-shadow:inset 0 0 0 2px rgba(251,191,36,0.5),0 0 6px rgba(251,191,36,0.3)!important;
 }
 .cell.has-clone{
-  box-shadow:inset 0 0 0 2px rgba(96,165,250,0.45),
-    0 0 8px rgba(96,165,250,0.3),0 0 18px rgba(37,99,235,0.15)!important;
-  animation:auroraClone 2.5s ease-in-out infinite!important;
+  box-shadow:inset 0 0 0 2px rgba(96,165,250,0.45),0 0 6px rgba(96,165,250,0.25)!important;
 }
 .cell.has-chain{
-  box-shadow:inset 0 0 0 2px rgba(244,114,182,0.45),
-    0 0 8px rgba(244,114,182,0.3),0 0 18px rgba(236,72,153,0.15)!important;
-  animation:auroraChain 2.5s ease-in-out infinite!important;
-}
-@keyframes auroraLightning{
-  0%,100%{box-shadow:inset 0 0 0 2px rgba(251,191,36,0.5),0 0 8px rgba(251,191,36,0.35),0 0 18px rgba(217,119,6,0.15);}
-  50%{box-shadow:inset 0 0 0 2px rgba(251,191,36,0.6),0 0 12px rgba(251,191,36,0.45),0 0 24px rgba(217,119,6,0.2);}
-}
-@keyframes auroraClone{
-  0%,100%{box-shadow:inset 0 0 0 2px rgba(96,165,250,0.45),0 0 8px rgba(96,165,250,0.3),0 0 18px rgba(37,99,235,0.15);}
-  50%{box-shadow:inset 0 0 0 2px rgba(96,165,250,0.55),0 0 12px rgba(96,165,250,0.4),0 0 24px rgba(37,99,235,0.2);}
-}
-@keyframes auroraChain{
-  0%,100%{box-shadow:inset 0 0 0 2px rgba(244,114,182,0.45),0 0 8px rgba(244,114,182,0.3),0 0 18px rgba(236,72,153,0.15);}
-  50%{box-shadow:inset 0 0 0 2px rgba(244,114,182,0.55),0 0 12px rgba(244,114,182,0.4),0 0 24px rgba(236,72,153,0.2);}
+  box-shadow:inset 0 0 0 2px rgba(244,114,182,0.45),0 0 6px rgba(244,114,182,0.25)!important;
 }
 /* WHY: 특수 심볼은 감자(84%)보다 작게 — 배경색 안에서 또렷하게 */
 /* WHY: 기본 감자 SVG 크기는 .cell svg(84%)를 상속. 오버레이는 ov-icon으로 격리 */
@@ -990,11 +1089,49 @@ svg.ov-icon{
   z-index:2!important;
   pointer-events:none!important;
 }
-.cell.ov-spawn{animation:ovSpawn .40s cubic-bezier(0.22,1,0.36,1)!important;}
-@keyframes ovSpawn{
-  0%  {transform:scale(.48);opacity:0.6;}
-  55% {transform:scale(1.06);}
-  100%{transform:scale(1);opacity:1;}
+/* WHY: 타입별 생성 연출 — 공통 ov-spawn 제거, 타입별 성격 차등 */
+/* gold: 묵직한 등장 + amber rim */
+.cell.spawn-gold{animation:spawnGold .28s cubic-bezier(0.22,1,0.36,1)!important;}
+@keyframes spawnGold{
+  0%{transform:scale(0.7);opacity:0.5;box-shadow:inset 0 0 0 rgba(212,165,16,0);}
+  50%{transform:scale(1.08);box-shadow:inset 0 0 8px rgba(212,165,16,0.3);}
+  100%{transform:scale(1);opacity:1;box-shadow:none;}
+}
+/* clock: 시원한 등장 + cyan flash */
+.cell.spawn-clock{animation:spawnClock .24s cubic-bezier(0.22,1,0.36,1)!important;}
+@keyframes spawnClock{
+  0%{transform:scale(0.75);opacity:0.5;}
+  55%{transform:scale(1.06);box-shadow:inset 0 0 6px rgba(13,148,136,0.3);}
+  100%{transform:scale(1);opacity:1;box-shadow:none;}
+}
+/* star: 밝고 화사한 등장 */
+.cell.spawn-star{animation:spawnStar .26s cubic-bezier(0.22,1,0.36,1)!important;}
+@keyframes spawnStar{
+  0%{transform:scale(0.6) rotate(-8deg);opacity:0.4;}
+  50%{transform:scale(1.1) rotate(2deg);box-shadow:inset 0 0 8px rgba(167,139,250,0.3);}
+  100%{transform:scale(1) rotate(0);opacity:1;box-shadow:none;}
+}
+/* lightning: 날카로운 번쩍 등장 */
+.cell.spawn-lightning{animation:spawnLightning .2s cubic-bezier(0.22,1,0.36,1)!important;}
+@keyframes spawnLightning{
+  0%{transform:scale(0.8) translateY(4px);opacity:0.3;}
+  45%{transform:scale(1.08) translateY(-1px);box-shadow:inset 0 0 6px rgba(251,191,36,0.35);}
+  100%{transform:scale(1) translateY(0);opacity:1;box-shadow:none;}
+}
+/* clone: 분화 느낌 — 좌우 미세 흔들림 */
+.cell.spawn-clone{animation:spawnClone .26s cubic-bezier(0.22,1,0.36,1)!important;}
+@keyframes spawnClone{
+  0%{transform:scale(0.7) translateX(-3px);opacity:0.4;}
+  40%{transform:scale(1.06) translateX(2px);box-shadow:inset 0 0 6px rgba(96,165,250,0.3);}
+  70%{transform:scale(1.02) translateX(-1px);}
+  100%{transform:scale(1) translateX(0);opacity:1;box-shadow:none;}
+}
+/* chain: 고리 연결 느낌 — 세로 stretch */
+.cell.spawn-chain{animation:spawnChain .24s cubic-bezier(0.22,1,0.36,1)!important;}
+@keyframes spawnChain{
+  0%{transform:scale(0.75) scaleY(0.85);opacity:0.4;}
+  50%{transform:scale(1.06) scaleY(1.04);box-shadow:inset 0 0 6px rgba(244,114,182,0.3);}
+  100%{transform:scale(1) scaleY(1);opacity:1;box-shadow:none;}
 }
 /* WHY: lr-hint filter:brightness → opacity 변화만. filter는 셀별 GPU 부하 */
 .cell.lr-hint{animation:lrHint 0.32s cubic-bezier(0.22,1,0.36,1) forwards;}
@@ -1207,12 +1344,11 @@ svg.ov-icon{
 }
 @keyframes cdSpin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
 /* 숫자 */
+/* WHY: 밝은 골드 그라디언트 — #FFE066→#FBBF24로 상단을 밝게. text-fill:transparent 시 text-shadow 무효하므로 제거 */
 .cd-num{
   font-family:'Inter','Noto Sans KR',sans-serif;font-size:76px;font-weight:900;
-  background:linear-gradient(180deg,#FBBF24 0%,#F59E0B 50%,#D97706 100%);
+  background:linear-gradient(180deg,#FFE066 0%,#FBBF24 40%,#F59E0B 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  /* WHY: filter:drop-shadow → text-shadow. 카운트다운 숫자에 filter는 과함 */
-  text-shadow:0 0 16px rgba(251,191,36,0.6),0 3px 6px rgba(0,0,0,0.8);
   position:relative;z-index:2;
 }
 .cd-num.pop{animation:cdNumPop .7s cubic-bezier(.175,.885,.32,1.275) forwards;}
@@ -1521,6 +1657,22 @@ svg.ov-icon{
         <div id="hl-stats"></div>
         <div class="hl-trigger" id="hl-trigger"></div>
       </div>
+      <!-- 주간 베스트 비교 카드 -->
+      <div class="result-weekly-card" id="weekly-card">
+        <div class="weekly-title">이번 주 도전</div>
+        <div class="weekly-body">
+          <div class="weekly-best-row">
+            <span class="weekly-lbl">내 최고</span>
+            <span class="weekly-val" id="w-best">—</span>
+          </div>
+          <div class="weekly-this-row" id="w-this-row">
+            <span class="weekly-lbl">이번 판</span>
+            <span class="weekly-val" id="w-this">—</span>
+          </div>
+          <div class="weekly-diff" id="w-diff"></div>
+          <div class="weekly-rank" id="w-rank"></div>
+        </div>
+      </div>
       <!-- 길드 기여 + 농장 단축 통합 메타카드 -->
       <div class="result-meta-card">
         <div class="result-meta-item">
@@ -1641,6 +1793,10 @@ const SWAP_FAIL_PUSH_RATIO  = 0.22;    // push 이동 비율 (셀간 거리의 N
 
 // 매치/낙하 타이밍
 const EXPLODE_WAIT    = 185; // 폭발 대기 (ms) — CSS .18s + 5ms 버퍼
+/* WHY: pre-pop — 터지기 직전 긴장감. CSS duration + 10ms 버퍼 */
+const PREPOP_WAIT     = 110; // 3매치 .1s + 10ms
+const PREPOP_STRONG   = 130; // 4매치 .12s + 10ms
+const PREPOP_SPECIAL  = 150; // 특수 .14s + 10ms
 const FALL_BASE_DUR   = 140; // 낙하 base duration (ms)
 const FALL_DIST_DUR   = 22;  // 낙하 dist당 추가 duration (ms)
 const FALL_WAIT_BASE  = 150; // 낙하 완료 대기 base (ms)
@@ -2667,6 +2823,24 @@ async function processMatches(matches){
   // WHY: matchTier 확정 후 단계별 효과음 호출
   playMatchSfx(combo,matchTier);
 
+  /* WHY: 화면 전체 보상 반응 — 좋은 플레이 순간만 발동. 3매치=무반응, 4매치+=light, chain3+=mid, 특수연계=heavy */
+  if(lowPerfLevel<2){
+    let impactLv=0; // 0=없음, 1=light, 2=mid, 3=heavy
+    if(matchTier>=1) impactLv=1;                     // 4매치+
+    if(combo>=3) impactLv=Math.max(impactLv,2);      // chain 3+
+    if(combo>=5||hasRainbow) impactLv=3;             // 대형연쇄/무지개
+    if(hasBomb&&hasRainbow) impactLv=3;              // 특수 연계
+    if(ovMsgs.length>=2) impactLv=Math.max(impactLv,2); // 특수감자 2개 이상 동시
+    if(impactLv>0){
+      const cls=['','impact-light','impact-mid','impact-heavy'][impactLv];
+      const phone=document.getElementById('phone');
+      phone.classList.remove('impact-light','impact-mid','impact-heavy');
+      void phone.offsetWidth;
+      phone.classList.add(cls);
+      addDelay(()=>phone.classList.remove(cls),300);
+    }
+  }
+
   /* WHY: 특수 감자가 exSet을 확장했으므로 exCellsFinal 사용 */
   // ── 플로팅 스코어 팝업 (단계별 차등) ──
   if(exCellsFinal.length>0){
@@ -2679,13 +2853,16 @@ async function processMatches(matches){
       isBig,isLastRush);
   }
 
-  /* WHY: 4매치+=강한 플래시. 중반(20~40초) 3매치=약한 플래시 */
-  if(matchTier>=1||(matchTier===0&&timeLeft>=20&&timeLeft<=40&&combo>=2)){
-    exCellsFinal.forEach(({r,c})=>{
-      const el=cellEls[r][c];
-      el.classList.add('match-flash');
-      addDelay(()=>el.classList.remove('match-flash'),matchTier>=1?180:120);
-    });
+  /* WHY: pre-pop → 짧은 대기 → explode 순서. "터지기 직전 긴장감" 핵심.
+     3매치=약한 pre-pop, 4매치=강한, 특수블록=최강. lowPerf 시 스킵. */
+  const ppClass=matchTier>=2||hasBomb||hasRainbow?'pre-pop-special':matchTier>=1?'pre-pop-strong':'pre-pop';
+  const ppWait=matchTier>=2||hasBomb||hasRainbow?PREPOP_SPECIAL:matchTier>=1?PREPOP_STRONG:PREPOP_WAIT;
+  const doPrepop=lowPerfLevel<2; // lv2에서는 스킵
+
+  if(doPrepop){
+    exCellsFinal.forEach(({r,c})=>cellEls[r][c].classList.add(ppClass));
+    await sleep(ppWait);
+    exCellsFinal.forEach(({r,c})=>cellEls[r][c].classList.remove(ppClass));
   }
 
   const ptclBig=hasBomb||hasRainbow;
@@ -2844,7 +3021,8 @@ function addScore(pts){
   const el=document.getElementById('h-score');
   el.textContent=score.toLocaleString();
   el.classList.remove('bump','bump-mid','bump-high','bump-fever');void el.offsetWidth;
-  el.classList.add(isFever?'bump-fever':combo>=4?'bump-high':combo>=2?'bump-mid':'bump');
+  /* WHY: 대형 연쇄(5+)도 fever급 bump — 화면 반응과 점수 반응이 같이 온다 */
+  el.classList.add(isFever||combo>=5?'bump-fever':combo>=4?'bump-high':combo>=2?'bump-mid':'bump');
 }
 function updateHUD(){
   document.getElementById('h-score').textContent=score.toLocaleString();
@@ -2856,6 +3034,14 @@ function updateHUD(){
   if(fill){
     fill.style.width=(timeLeft/GAME_SEC*100)+'%';
     fill.style.background=timeLeft<=5?'var(--red)':timeLeft<=LR_TRIGGER_SEC?'#FBBF24':'var(--d)';
+  }
+  /* WHY: 3단계 pill 상태 — :has() 제거, 클래스 직접 제어 */
+  const tr=document.querySelector('.hud-time-row');
+  if(tr){
+    tr.classList.remove('time-warn','time-rush','time-danger');
+    if(timeLeft<=5&&timeLeft>0) tr.classList.add('time-danger');
+    else if(timeLeft<=10&&timeLeft>0) tr.classList.add('time-rush');
+    else if(timeLeft<=30&&timeLeft>0) tr.classList.add('time-warn');
   }
 }
 /* WHY: feverGauge 적립 + 임계값 도달 시 피버 발동. 콤보 무관. */
@@ -2990,7 +3176,10 @@ function exitLastRushVisual(){
   const uf=document.getElementById('uf');
   te.classList.remove('last-rush'); te.classList.add('urgent');
   uf.classList.remove('last-rush'); uf.classList.add('on');
-  document.getElementById('s-play').classList.remove('last-rush-mode');
+  /* WHY: 5초 이하 → last-rush amber 배경 → urgent 빨간 배경으로 전환 */
+  const sp=document.getElementById('s-play');
+  sp.classList.remove('last-rush-mode');
+  sp.classList.add('urgent-bg');
 }
 function clearLastRushVisual(){
   // 게임 종료·연장 팝업 시 모든 lastRush/urgent 클래스 정리
@@ -3003,7 +3192,10 @@ function clearLastRushVisual(){
   const uf=document.getElementById('uf');
   te.classList.remove('last-rush','urgent');
   uf.classList.remove('last-rush','on');
-  document.getElementById('s-play').classList.remove('last-rush-mode');
+  /* WHY: 종료/연장 시 모든 긴장 시각 잔상 완전 제거 */
+  document.getElementById('s-play').classList.remove('last-rush-mode','urgent-bg');
+  const tr=document.querySelector('.hud-time-row');
+  if(tr) tr.classList.remove('time-warn','time-rush','time-danger');
 }
 
 /* ════════════════════════════════════════════════
@@ -3308,8 +3500,12 @@ function spawnOverlay(){
   if(ov==='gold') board[r][c].goldDir=Math.random()<0.5?'row':'col';
   updateCell(r,c);
   const el=cellEls[r][c];
-  /* WHY: addDelay로 등록 → 게임 종료 시 clearAllDelays로 일괄 정리 */
-  if(lowPerfLevel<2){el.classList.add('ov-spawn');addDelay(()=>el.classList.remove('ov-spawn'),460);}
+  /* WHY: 타입별 생성 연출 — 종류마다 다른 성격의 등장. addDelay로 종료 시 정리 */
+  if(lowPerfLevel<2){
+    const spawnCls='spawn-'+ov;
+    el.classList.add(spawnCls);
+    addDelay(()=>el.classList.remove(spawnCls),300);
+  }
   perfTag('overlay_spawn');
 }
 /* WHY: 중반(20~40초) 도파민 피크 — 오버레이 주기를 시간대별 차등 */
@@ -3483,6 +3679,29 @@ function showResult(serverResult){
   ri.classList.remove('show');
   requestAnimationFrame(()=>requestAnimationFrame(()=>ri.classList.add('show')));
 
+  /* WHY: 제목을 감정형으로 — "RESULT" 대신 이번 판 성과에 맞는 한 줄 */
+  const titleEl=document.querySelector('.result-title');
+  if(maxCombo>=6) titleEl.textContent='🔥 대폭발이었다!';
+  else if(maxCombo>=5) titleEl.textContent='피버까지 갔다!';
+  else if(isLastRush&&score>0&&Math.round((score-scoreAtRushStart)/score*100)>=25) titleEl.textContent='막판 역전!';
+  else if(score>=5000) titleEl.textContent='좋은 흐름이었다';
+  else if(maxCombo>=3) titleEl.textContent='괜찮은 한 판';
+  else titleEl.textContent='다음 판이 진짜다';
+
+  /* WHY: replay 문구 — 신기록=이어가기, 1000점 이내=재도전, 그 외=한 판 더 */
+  const replayBtn=document.querySelector('.replay-btn');
+  const _wk='wb_'+new Date().getFullYear()+'_'+getISOWeek();
+  const _wd=JSON.parse(sessionStorage.getItem(_wk)||'{"best":0}');
+  const _isNewBest=finalScore>=_wd.best&&finalScore>0;
+  const _gap=_wd.best-finalScore;
+  if(playsLeft>0){
+    if(_isNewBest) replayBtn.textContent='이 흐름 이어가기';
+    else if(_gap<=1000) replayBtn.textContent='신기록 재도전';
+    else replayBtn.textContent='한 판 더';
+  }else{
+    replayBtn.textContent='오늘 플레이 완료';
+  }
+
   // 기본 점수 표시 (광고 배율 역산)
   const base=adBoostOn?Math.round(score/AD_MULT):score;
   document.getElementById('r-base').textContent=`${base.toLocaleString()}점 (기본)`;
@@ -3558,6 +3777,44 @@ function showResult(serverResult){
     else if(isValid) ctaEl.textContent='🏆 길드 랭킹에 반영됨';
     else ctaEl.textContent='🏆 다음 판도 길드에 기여됩니다';
   }
+
+  // ── 주간 베스트 비교 카드 ──
+  // WHY: 서버 연동 전에는 로컬 sessionStorage로 주간 최고점 추적.
+  //       서버 연동 후에는 sr.weeklyBest로 교체.
+  updateWeeklyCard(finalScore);
+}
+
+/* WHY: 주간 베스트 로컬 추적 — 서버 연동 전 임시. ISO week 기준. */
+function getISOWeek(){
+  const d=new Date();const t=new Date(d.getFullYear(),0,1);
+  return Math.ceil(((d-t)/86400000+t.getDay()+1)/7);
+}
+function updateWeeklyCard(thisScore){
+  const key='wb_'+new Date().getFullYear()+'_'+getISOWeek();
+  const stored=JSON.parse(sessionStorage.getItem(key)||'{"best":0,"rank":null}');
+  const isNewRecord=thisScore>stored.best;
+  if(isNewRecord){stored.best=thisScore;stored.achievedAt=Date.now();sessionStorage.setItem(key,JSON.stringify(stored));}
+
+  const bestEl=document.getElementById('w-best');
+  const thisEl=document.getElementById('w-this');
+  const diffEl=document.getElementById('w-diff');
+  const rankEl=document.getElementById('w-rank');
+  const thisRow=document.getElementById('w-this-row');
+
+  bestEl.textContent=stored.best>0?stored.best.toLocaleString()+'점':'—';
+  thisEl.textContent=thisScore.toLocaleString()+'점';
+
+  if(isNewRecord){
+    thisRow.classList.add('new-record');
+    diffEl.textContent='🏆 신기록!';
+    diffEl.className='weekly-diff positive';
+  }else{
+    thisRow.classList.remove('new-record');
+    const gap=stored.best-thisScore;
+    diffEl.textContent=gap>0?gap.toLocaleString()+'점 차이':'';
+    diffEl.className='weekly-diff negative';
+  }
+  rankEl.textContent=''; // 서버 연동 후 순위 표시
 }
 
 /* ════════════════════════════════════════════════
@@ -3587,7 +3844,7 @@ function startGame(){
   if(!cellEls.length||!cellEls[0])initBoardDOM();
   updateAll();
   updateHUD();
-  document.getElementById('s-play').classList.remove('fever-mode','last-rush-mode','perf-low');
+  document.getElementById('s-play').classList.remove('fever-mode','last-rush-mode','urgent-bg','perf-low');
   document.getElementById('fever-banner').classList.remove('on');
   document.getElementById('combo-strip').className='combo-strip';
   document.getElementById('fever-gauge').className='fever-gauge';
@@ -3613,7 +3870,7 @@ function goLobby(){
   if(typeof clearEventTimers==='function')clearEventTimers();
   document.getElementById('lby-plays').textContent=playsLeft;
   const sp=document.getElementById('s-play');
-  sp.classList.remove('fever-mode','last-rush-mode','golden-mode','rush-mode');
+  sp.classList.remove('fever-mode','last-rush-mode','urgent-bg','golden-mode','rush-mode');
   document.getElementById('uf').classList.remove('on','last-rush');
   document.getElementById('h-time').classList.remove('urgent','last-rush','tick');
   document.getElementById('gameover').classList.remove('on');
@@ -3621,7 +3878,7 @@ function goLobby(){
   const ri=document.querySelector('.result-inner');
   if(ri){ri.classList.remove('show');ri.style.opacity='';ri.style.transform='';}
   // 결과 카드 animation 잔류 해제
-  document.querySelectorAll('.result-score-card,.result-hl-card,.result-meta-card,.result-actions').forEach(el=>{el.style.animation='';});
+  document.querySelectorAll('.result-score-card,.result-hl-card,.result-weekly-card,.result-meta-card,.result-actions').forEach(el=>{el.style.animation='';});
   showScreen('lobby');
   console.log('[goLobby] 로비 전환 완료');
 }
